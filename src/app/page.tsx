@@ -1,5 +1,7 @@
 import Image from 'next/image'
 
+// This is the default export of the page component, which will be rendered when the user visits the root URL of the application.
+
 export default function Home() {
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
