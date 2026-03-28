@@ -1,5 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
+import { provisionUser } from '@/lib/provision-user'
 
 export default async function DashboardPage() {
   const { userId } = await auth()
@@ -9,6 +10,17 @@ export default async function DashboardPage() {
   }
 
   const user = await currentUser()
+  const email = user?.emailAddresses[0]?.emailAddress
+
+  if (user && email) {
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ')
+
+    await provisionUser({
+      clerkUserId: user.id,
+      email,
+      fullName,
+    })
+  }
 
   return (
     <div className="p-8 max-w-7xl mx-auto">

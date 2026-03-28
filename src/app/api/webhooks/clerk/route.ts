@@ -1,8 +1,7 @@
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { Webhook } from 'svix'
-import { db } from '@/lib/db'
-import { users, tenants } from '@/db/schema'
+import { provisionUser } from '@/lib/provision-user'
 
 type ClerkUserCreatedEvent = {
   type: string
@@ -62,25 +61,10 @@ export async function POST(request: Request) {
     const email = email_addresses[0]?.email_address ?? ''
     const fullName = [first_name, last_name].filter(Boolean).join(' ') || email
 
-    // Create a default tenant for this user
-    const [tenant] = await db
-      .insert(tenants)
-      .values({
-        name: fullName + "'s Workspace",
-        slug: clerkUserId.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        plan: 'free',
-        status: 'active',
-      })
-      .returning()
-
-    // Create the user linked to the tenant
-    await db.insert(users).values({
-      id: clerkUserId,
-      tenantId: tenant.id,
+    await provisionUser({
+      clerkUserId,
       email,
       fullName,
-      role: 'firm_admin',
-      kycStatus: 'pending',
     })
 
     console.log('Created user + tenant for:', email)
