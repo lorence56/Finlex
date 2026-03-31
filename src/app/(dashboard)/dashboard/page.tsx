@@ -1,81 +1,125 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { provisionUser } from '@/lib/provision-user'
+import { db } from '@/lib/db'
+import { users, tenants } from '@/db/schema'
+import { eq } from 'drizzle-orm'
+import { StatCard } from '@/components/ui/StatCard'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { Building2, Scale, FileText, AlertCircle } from 'lucide-react'
+import Link from 'next/link'
 
 export default async function DashboardPage() {
   const { userId } = await auth()
+  if (!userId) redirect('/sign-in')
 
-  if (!userId) {
-    redirect('/sign-in')
-  }
+  const userRows = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+  const dbUser = userRows[0]
 
-  const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress
-
-  if (user && email) {
-    const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ')
-
-    await provisionUser({
-      clerkUserId: user.id,
-      email,
-      fullName,
-    })
-  }
+  const tenantRows = dbUser
+    ? await db
+        .select()
+        .from(tenants)
+        .where(eq(tenants.id, dbUser.tenantId))
+        .limit(1)
+    : []
+  const tenant = tenantRows[0]
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold">
-          Welcome back, {user?.firstName ?? 'there'}
-        </h1>
-        <p className="text-gray-600">Here is your Finlex Platform overview</p>
-      </header>
+    <div>
+      <PageHeader
+        title={`Good day${dbUser ? ', ' + dbUser.fullName.split(' ')[0] : ''}`}
+        description={tenant ? tenant.name : 'Welcome to Finlex Platform'}
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="p-6 bg-white border rounded-xl shadow-sm">
-          <h3 className="font-semibold text-gray-500">Companies</h3>
-          <p className="text-2xl font-bold">0</p>
-          <p className="text-sm text-gray-400">registered entities</p>
-        </div>
-
-        <div className="p-6 bg-white border rounded-xl shadow-sm">
-          <h3 className="font-semibold text-gray-500">Matters</h3>
-          <p className="text-2xl font-bold">0</p>
-          <p className="text-sm text-gray-400">active cases</p>
-        </div>
-
-        <div className="p-6 bg-white border rounded-xl shadow-sm">
-          <h3 className="font-semibold text-gray-500">Invoices</h3>
-          <p className="text-2xl font-bold">0</p>
-          <p className="text-sm text-gray-400">outstanding</p>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatCard
+          label="Companies"
+          value={0}
+          icon={Building2}
+          color="blue"
+          trend="No companies yet"
+        />
+        <StatCard
+          label="Matters"
+          value={0}
+          icon={Scale}
+          color="green"
+          trend="No active matters"
+        />
+        <StatCard
+          label="Documents"
+          value={0}
+          icon={FileText}
+          color="amber"
+          trend="No documents yet"
+        />
+        <StatCard
+          label="Compliance"
+          value={0}
+          icon={AlertCircle}
+          color="red"
+          trend="All clear"
+        />
       </div>
 
-      <section className="p-6 bg-gray-50 border rounded-xl">
-        <h2 className="text-xl font-bold mb-4">Account info</h2>
-        <div className="space-y-4">
-          <div>
-            <span className="block text-sm font-medium text-gray-500">
-              Clerk User ID
-            </span>
-            <code className="text-xs bg-gray-200 p-1 rounded">{userId}</code>
-          </div>
-
-          <div>
-            <span className="block text-sm font-medium text-gray-500">
-              Email
-            </span>
-            <p>{user?.emailAddresses[0]?.emailAddress ?? '—'}</p>
-          </div>
-
-          <div>
-            <span className="block text-sm font-medium text-gray-500">
-              Status
-            </span>
-            <span className="text-green-600 font-semibold">Active</span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
+          <h2 className="text-sm font-semibold text-slate-800 mb-4">
+            Recent activity
+          </h2>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <p className="text-sm text-slate-400">No activity yet.</p>
+            <p className="text-xs text-slate-300 mt-1">
+              Actions you take will appear here.
+            </p>
           </div>
         </div>
-      </section>
+
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <h2 className="text-sm font-semibold text-slate-800 mb-4">
+            Quick actions
+          </h2>
+          <div className="space-y-2">
+            {[
+              {
+                label: 'Register a company',
+                href: '/dashboard/companies/new',
+                icon: Building2,
+              },
+              {
+                label: 'Open a legal matter',
+                href: '/dashboard/legal/new',
+                icon: Scale,
+              },
+              {
+                label: 'Upload a document',
+                href: '/dashboard/documents',
+                icon: FileText,
+              },
+            ].map(({ label, href, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition-all group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                  <Icon
+                    size={15}
+                    className="text-slate-500 group-hover:text-blue-600 transition-colors"
+                  />
+                </div>
+                <span className="text-sm text-slate-700 group-hover:text-blue-700 transition-colors">
+                  {label}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

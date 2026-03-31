@@ -80,3 +80,78 @@ export type NewTenant = typeof tenants.$inferInsert
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type AuditLog = typeof auditLogs.$inferSelect
+
+// ============================================
+// COMPANIES
+// ============================================
+export const companies = pgTable(
+  'companies',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    registrationNo: text('registration_no'),
+    entityType: text('entity_type').notNull().default('private_limited'),
+    status: text('status').notNull().default('active'),
+    incorporatedAt: text('incorporated_at'),
+    registeredAddress: text('registered_address'),
+    kraPin: text('kra_pin'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [index('companies_tenant_id_idx').on(table.tenantId)]
+)
+
+// ============================================
+// DIRECTORS
+// ============================================
+export const directors = pgTable(
+  'directors',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    fullName: text('full_name').notNull(),
+    idNumber: text('id_number'),
+    email: text('email'),
+    phone: text('phone'),
+    appointedAt: text('appointed_at'),
+    resignedAt: text('resigned_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [index('directors_company_id_idx').on(table.companyId)]
+)
+
+// ============================================
+// SHAREHOLDERS
+// ============================================
+export const shareholders = pgTable(
+  'shareholders',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    idNumber: text('id_number'),
+    email: text('email'),
+    shares: text('shares').notNull().default('0'),
+    shareClass: text('share_class').notNull().default('ordinary'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [index('shareholders_company_id_idx').on(table.companyId)]
+)
+
+export type Company = typeof companies.$inferSelect
+export type NewCompany = typeof companies.$inferInsert
+export type Director = typeof directors.$inferSelect
+export type Shareholder = typeof shareholders.$inferSelect
