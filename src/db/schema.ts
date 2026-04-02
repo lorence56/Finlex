@@ -1,4 +1,11 @@
-import { pgTable, text, boolean, timestamp, index } from 'drizzle-orm/pg-core'
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+} from 'drizzle-orm/pg-core'
 
 // ============================================
 // TENANTS
@@ -155,3 +162,118 @@ export type Company = typeof companies.$inferSelect
 export type NewCompany = typeof companies.$inferInsert
 export type Director = typeof directors.$inferSelect
 export type Shareholder = typeof shareholders.$inferSelect
+
+// ============================================
+// MATTERS
+// ============================================
+export const matters = pgTable(
+  'matters',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    clientId: text('client_id').notNull(),
+    assignedTo: text('assigned_to').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    type: text('type').notNull(),
+    status: text('status').notNull().default('open'),
+    priority: text('priority').notNull().default('medium'),
+    description: text('description').notNull(),
+    dueDate: timestamp('due_date'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('matters_tenant_id_idx').on(table.tenantId),
+    index('matters_assigned_to_idx').on(table.assignedTo),
+    index('matters_status_idx').on(table.status),
+    index('matters_due_date_idx').on(table.dueDate),
+  ]
+)
+
+// ============================================
+// MATTER TASKS
+// ============================================
+export const matterTasks = pgTable(
+  'matter_tasks',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    matterId: text('matter_id')
+      .notNull()
+      .references(() => matters.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    status: text('status').notNull().default('todo'),
+    assignedTo: text('assigned_to').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    dueDate: timestamp('due_date'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('matter_tasks_matter_id_idx').on(table.matterId),
+    index('matter_tasks_assigned_to_idx').on(table.assignedTo),
+  ]
+)
+
+// ============================================
+// MATTER NOTES
+// ============================================
+export const matterNotes = pgTable(
+  'matter_notes',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    matterId: text('matter_id')
+      .notNull()
+      .references(() => matters.id, { onDelete: 'cascade' }),
+    authorId: text('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    body: text('body').notNull(),
+    isPrivate: boolean('is_private').notNull().default(false),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('matter_notes_matter_id_idx').on(table.matterId),
+    index('matter_notes_author_id_idx').on(table.authorId),
+  ]
+)
+
+// ============================================
+// TIME ENTRIES
+// ============================================
+export const timeEntries = pgTable(
+  'time_entries',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    matterId: text('matter_id')
+      .notNull()
+      .references(() => matters.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    description: text('description').notNull(),
+    minutes: integer('minutes').notNull(),
+    billedAt: timestamp('billed_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('time_entries_matter_id_idx').on(table.matterId),
+    index('time_entries_user_id_idx').on(table.userId),
+  ]
+)
+
+export type Matter = typeof matters.$inferSelect
+export type NewMatter = typeof matters.$inferInsert
+export type MatterTask = typeof matterTasks.$inferSelect
+export type MatterNote = typeof matterNotes.$inferSelect
+export type TimeEntry = typeof timeEntries.$inferSelect

@@ -1,8 +1,8 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
-import { users, tenants } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { matters, tenants, users } from '@/db/schema'
+import { count, eq } from 'drizzle-orm'
 import { StatCard } from '@/components/ui/StatCard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Building2, Scale, FileText, AlertCircle } from 'lucide-react'
@@ -28,6 +28,14 @@ export default async function DashboardPage() {
     : []
   const tenant = tenantRows[0]
 
+  const matterCountRows = dbUser
+    ? await db
+        .select({ value: count() })
+        .from(matters)
+        .where(eq(matters.tenantId, dbUser.tenantId))
+    : []
+  const matterCount = matterCountRows[0]?.value ?? 0
+
   return (
     <div>
       <PageHeader
@@ -45,10 +53,14 @@ export default async function DashboardPage() {
         />
         <StatCard
           label="Matters"
-          value={0}
+          value={matterCount}
           icon={Scale}
           color="green"
-          trend="No active matters"
+          trend={
+            matterCount === 0
+              ? 'No active matters'
+              : `${matterCount} matter${matterCount === 1 ? '' : 's'} in workspace`
+          }
         />
         <StatCard
           label="Documents"

@@ -1,0 +1,128 @@
+.staggerFade {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: stagger-fade 0.7s ease forwards;
+}
+
+.delayOne {
+  animation-delay: 0.15s;
+}
+
+.delayTwo {
+  animation-delay: 0.3s;
+}
+
+.delayThree {
+  animation-delay: 0.45s;
+}
+
+.floatUi {
+  animation: float-ui 5s ease-in-out infinite;
+}
+
+.goldPulse {
+  animation: gold-pulse 2s ease-in-out infinite;
+}
+
+.drawLine {
+  position: relative;
+  overflow: hidden;
+}
+
+.drawLine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: linear-gradient(90deg, #c9a646, #e7d7a2);
+  animation: draw-line 1.1s ease 0.4s forwards;
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 75%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.2),
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 1.2s ease-in-out 1;
+}
+
+.shineButton {
+  position: relative;
+  overflow: hidden;
+}
+
+.shineButton::after {
+  content: "";
+  position: absolute;
+  top: -100%;
+  left: -30%;
+  width: 24%;
+  height: 280%;
+  transform: rotate(20deg);
+  background: rgba(255, 255, 255, 0.32);
+  transition: left 0.45s ease;
+}
+
+.shineButton:hover::after {
+  left: 118%;
+}
+
+@keyframes stagger-fade {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float-ui {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes gold-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(231, 215, 162, 0.24);
+  }
+  50% {
+    box-shadow: 0 0 0 9px rgba(231, 215, 162, 0);
+  }
+}
+
+@keyframes draw-line {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    left: -120%;
+  }
+  to {
+    left: 135%;
+  }
+}
