@@ -32,6 +32,7 @@ export default function NewMatterPage() {
     description: '',
     priority: 'medium',
     dueDate: '',
+    billingRatePerHour: '250',
   })
 
   const set = (key: keyof typeof form, value: string) =>
@@ -54,7 +55,7 @@ export default function NewMatterPage() {
         throw new Error(data.error ?? 'Failed to create matter')
       }
 
-      router.push('/dashboard/legal')
+      router.push(`/dashboard/legal/${data.matter.id}`)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -133,7 +134,7 @@ export default function NewMatterPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className={label}>Priority</label>
             <select
@@ -156,6 +157,18 @@ export default function NewMatterPage() {
               className={field}
               value={form.dueDate}
               onChange={(event) => set('dueDate', event.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className={label}>Billing rate / hour (USD)</label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              className={field}
+              value={form.billingRatePerHour}
+              onChange={(event) => set('billingRatePerHour', event.target.value)}
             />
           </div>
         </div>

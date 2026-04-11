@@ -3,29 +3,13 @@ import { desc, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { matters } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
-
-const VALID_TYPES = [
-  'Corporate',
-  'Employment',
-  'Property',
-  'Dispute',
-  'Contract',
-  'IP',
-] as const
-
-const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const
-
-function normalizeString(value: unknown) {
-  return typeof value === 'string' ? value.trim() : ''
-}
-
-function parseOptionalDate(value: unknown) {
-  const normalized = normalizeString(value)
-  if (!normalized) return null
-
-  const parsed = new Date(normalized)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
+import {
+  isInArray,
+  MATTER_PRIORITIES,
+  MATTER_TYPES,
+  normalizeString,
+  parseOptionalDate,
+} from '@/lib/legal'
 
 export async function GET() {
   const dbUser = await getCurrentDbUser()
@@ -54,8 +38,13 @@ export async function POST(request: Request) {
   const description = normalizeString(body.description)
   const priority = normalizeString(body.priority).toLowerCase()
   const dueDate = parseOptionalDate(body.dueDate)
+  const billingRatePerHour =
+    Number.isFinite(Number(body.billingRatePerHour)) &&
+    Number(body.billingRatePerHour) > 0
+      ? Math.round(Number(body.billingRatePerHour) * 100)
+      : 25000
 
-  if (!VALID_TYPES.includes(type as (typeof VALID_TYPES)[number])) {
+  if (!isInArray(type, MATTER_TYPES)) {
     return NextResponse.json(
       { error: 'Matter type is invalid' },
       { status: 400 }
@@ -77,7 +66,7 @@ export async function POST(request: Request) {
   }
 
   if (
-    !VALID_PRIORITIES.includes(priority as (typeof VALID_PRIORITIES)[number])
+    !isInArray(priority, MATTER_PRIORITIES)
   ) {
     return NextResponse.json({ error: 'Priority is invalid' }, { status: 400 })
   }
@@ -96,6 +85,7 @@ export async function POST(request: Request) {
       status: 'open',
       priority,
       description,
+      billingRatePerHour,
       dueDate,
     })
     .returning()

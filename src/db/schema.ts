@@ -183,6 +183,9 @@ export const matters = pgTable(
     status: text('status').notNull().default('open'),
     priority: text('priority').notNull().default('medium'),
     description: text('description').notNull(),
+    billingRatePerHour: integer('billing_rate_per_hour')
+      .notNull()
+      .default(25000),
     dueDate: timestamp('due_date'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -272,8 +275,164 @@ export const timeEntries = pgTable(
   ]
 )
 
+// ============================================
+// CONTRACTS
+// ============================================
+export const contracts = pgTable(
+  'contracts',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    matterId: text('matter_id').references(() => matters.id, {
+      onDelete: 'set null',
+    }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    body: text('body').notNull().default(''),
+    status: text('status').notNull().default('draft'),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('contracts_tenant_id_idx').on(table.tenantId),
+    index('contracts_matter_id_idx').on(table.matterId),
+    index('contracts_status_idx').on(table.status),
+  ]
+)
+
+// ============================================
+// CLIENTS
+// ============================================
+export const clients = pgTable(
+  'clients',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    fullName: text('full_name').notNull(),
+    email: text('email'),
+    phone: text('phone'),
+    companyName: text('company_name'),
+    type: text('type').notNull().default('corporate'),
+    status: text('status').notNull().default('active'),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('clients_tenant_id_idx').on(table.tenantId),
+    index('clients_status_idx').on(table.status),
+    index('clients_email_idx').on(table.email),
+  ]
+)
+
+// ============================================
+// DOCUMENTS
+// ============================================
+export const documents = pgTable(
+  'documents',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    matterId: text('matter_id').references(() => matters.id, {
+      onDelete: 'set null',
+    }),
+    clientId: text('client_id').references(() => clients.id, {
+      onDelete: 'set null',
+    }),
+    title: text('title').notNull(),
+    category: text('category').notNull().default('general'),
+    status: text('status').notNull().default('draft'),
+    fileUrl: text('file_url'),
+    uploadedBy: text('uploaded_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('documents_tenant_id_idx').on(table.tenantId),
+    index('documents_matter_id_idx').on(table.matterId),
+    index('documents_client_id_idx').on(table.clientId),
+    index('documents_status_idx').on(table.status),
+  ]
+)
+
+// ============================================
+// ACCOUNTING ENTRIES
+// ============================================
+export const accountingEntries = pgTable(
+  'accounting_entries',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    clientId: text('client_id').references(() => clients.id, {
+      onDelete: 'set null',
+    }),
+    matterId: text('matter_id').references(() => matters.id, {
+      onDelete: 'set null',
+    }),
+    type: text('type').notNull().default('income'),
+    category: text('category').notNull().default('legal_fee'),
+    description: text('description').notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    currency: text('currency').notNull().default('USD'),
+    entryDate: timestamp('entry_date').notNull().defaultNow(),
+    reference: text('reference'),
+    createdBy: text('created_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('accounting_entries_tenant_id_idx').on(table.tenantId),
+    index('accounting_entries_type_idx').on(table.type),
+    index('accounting_entries_entry_date_idx').on(table.entryDate),
+  ]
+)
+
+// ============================================
+// TENANT SETTINGS
+// ============================================
+export const tenantSettings = pgTable(
+  'tenant_settings',
+  {
+    tenantId: text('tenant_id')
+      .primaryKey()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    timezone: text('timezone').notNull().default('UTC'),
+    currency: text('currency').notNull().default('USD'),
+    billingTermsDays: integer('billing_terms_days').notNull().default(30),
+    invoicePrefix: text('invoice_prefix').notNull().default('INV'),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [index('tenant_settings_currency_idx').on(table.currency)]
+)
+
 export type Matter = typeof matters.$inferSelect
 export type NewMatter = typeof matters.$inferInsert
 export type MatterTask = typeof matterTasks.$inferSelect
 export type MatterNote = typeof matterNotes.$inferSelect
 export type TimeEntry = typeof timeEntries.$inferSelect
+export type Contract = typeof contracts.$inferSelect
+export type Client = typeof clients.$inferSelect
+export type NewClient = typeof clients.$inferInsert
+export type Document = typeof documents.$inferSelect
+export type AccountingEntry = typeof accountingEntries.$inferSelect
+export type TenantSettings = typeof tenantSettings.$inferSelect

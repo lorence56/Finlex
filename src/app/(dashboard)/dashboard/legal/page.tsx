@@ -2,13 +2,14 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
 import { desc, eq } from 'drizzle-orm'
-import { Plus, Scale } from 'lucide-react'
+import { ChevronRight, Plus, Scale } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { matters } from '@/db/schema'
 import { db } from '@/lib/db'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
+import { humanizeSnakeCase } from '@/lib/legal'
 
 function getStatusVariant(status: string) {
   switch (status) {
@@ -16,6 +17,8 @@ function getStatusVariant(status: string) {
       return 'blue'
     case 'in_progress':
       return 'amber'
+    case 'awaiting_client':
+      return 'red'
     case 'closed':
       return 'green'
     default:
@@ -99,6 +102,7 @@ export default async function LegalPage() {
                 <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
                   Due date
                 </th>
+                <th className="px-5 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -133,7 +137,7 @@ export default async function LegalPage() {
                   </td>
                   <td className="px-5 py-3.5">
                     <Badge
-                      label={matter.status.replace(/_/g, ' ')}
+                      label={humanizeSnakeCase(matter.status)}
                       variant={getStatusVariant(matter.status)}
                     />
                   </td>
@@ -141,6 +145,14 @@ export default async function LegalPage() {
                     {matter.dueDate
                       ? format(matter.dueDate, 'dd MMM yyyy')
                       : '-'}
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <Link
+                      href={`/dashboard/legal/${matter.id}`}
+                      className="text-slate-400 hover:text-blue-600 transition-colors"
+                    >
+                      <ChevronRight size={16} />
+                    </Link>
                   </td>
                 </tr>
               ))}

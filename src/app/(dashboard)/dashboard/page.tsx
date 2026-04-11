@@ -1,8 +1,15 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
-import { matters, tenants, users } from '@/db/schema'
-import { count, eq } from 'drizzle-orm'
+import {
+  accountingEntries,
+  companies,
+  documents,
+  matters,
+  tenants,
+  users,
+} from '@/db/schema'
+import { and, count, eq, lt, ne, sql } from 'drizzle-orm'
 import { StatCard } from '@/components/ui/StatCard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Building2, Scale, FileText, AlertCircle } from 'lucide-react'
@@ -28,13 +35,53 @@ export default async function DashboardPage() {
     : []
   const tenant = tenantRows[0]
 
-  const matterCountRows = dbUser
-    ? await db
-        .select({ value: count() })
-        .from(matters)
-        .where(eq(matters.tenantId, dbUser.tenantId))
-    : []
+  const [
+    companyCountRows,
+    matterCountRows,
+    documentCountRows,
+    complianceRows,
+    accountingTotalsRows,
+  ] = dbUser
+    ? await Promise.all([
+        db
+          .select({ value: count() })
+          .from(companies)
+          .where(eq(companies.tenantId, dbUser.tenantId)),
+        db
+          .select({ value: count() })
+          .from(matters)
+          .where(eq(matters.tenantId, dbUser.tenantId)),
+        db
+          .select({ value: count() })
+          .from(documents)
+          .where(eq(documents.tenantId, dbUser.tenantId)),
+        db
+          .select({ value: count() })
+          .from(matters)
+          .where(
+            and(
+              eq(matters.tenantId, dbUser.tenantId),
+              lt(matters.dueDate, new Date()),
+              ne(matters.status, 'closed')
+            )
+          ),
+        db
+          .select({
+            income: sql<number>`coalesce(sum(case when ${accountingEntries.type} = 'income' then ${accountingEntries.amountCents} else 0 end), 0)`,
+            expense: sql<number>`coalesce(sum(case when ${accountingEntries.type} = 'expense' then ${accountingEntries.amountCents} else 0 end), 0)`,
+          })
+          .from(accountingEntries)
+          .where(eq(accountingEntries.tenantId, dbUser.tenantId)),
+      ])
+    : [[], [], [], [], []]
+
+  const companyCount = companyCountRows[0]?.value ?? 0
   const matterCount = matterCountRows[0]?.value ?? 0
+  const documentCount = documentCountRows[0]?.value ?? 0
+  const complianceCount = complianceRows[0]?.value ?? 0
+  const accountingIncome = accountingTotalsRows[0]?.income ?? 0
+  const accountingExpense = accountingTotalsRows[0]?.expense ?? 0
+  const accountingNet = accountingIncome - accountingExpense
 
   return (
     <div>
@@ -46,10 +93,14 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
           label="Companies"
-          value={0}
+          value={companyCount}
           icon={Building2}
           color="blue"
-          trend="No companies yet"
+          trend={
+            companyCount === 0
+              ? 'No companies yet'
+              : `${companyCount} compan${companyCount === 1 ? 'y' : 'ies'} registered`
+          }
         />
         <StatCard
           label="Matters"
@@ -64,17 +115,25 @@ export default async function DashboardPage() {
         />
         <StatCard
           label="Documents"
-          value={0}
+          value={documentCount}
           icon={FileText}
           color="amber"
-          trend="No documents yet"
+          trend={
+            documentCount === 0
+              ? 'No documents yet'
+              : `${documentCount} tracked document${documentCount === 1 ? '' : 's'}`
+          }
         />
         <StatCard
           label="Compliance"
-          value={0}
+          value={complianceCount}
           icon={AlertCircle}
           color="red"
-          trend="All clear"
+          trend={
+            complianceCount === 0
+              ? 'All clear'
+              : `${complianceCount} overdue matter${complianceCount === 1 ? '' : 's'}`
+          }
         />
       </div>
 
@@ -83,10 +142,29 @@ export default async function DashboardPage() {
           <h2 className="text-sm font-semibold text-slate-800 mb-4">
             Recent activity
           </h2>
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <p className="text-sm text-slate-400">No activity yet.</p>
-            <p className="text-xs text-slate-300 mt-1">
-              Actions you take will appear here.
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-lg border border-slate-100 p-4">
+              <p className="text-xs text-slate-500">Accounting net position</p>
+              <p
+                className={`mt-1 text-lg font-semibold ${
+                  accountingNet >= 0 ? 'text-emerald-700' : 'text-red-700'
+                }`}
+              >
+                {new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: 'USD',
+                  maximumFractionDigits: 2,
+                }).format(accountingNet / 100)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-100 p-4">
+              <p className="text-xs text-slate-500">Open legal matters</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">
+                {matterCount}
+              </p>
+            </div>
+            <p className="text-xs text-slate-400 col-span-full">
+              Snapshot generated from real workspace data.
             </p>
           </div>
         </div>

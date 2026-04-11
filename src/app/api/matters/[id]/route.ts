@@ -3,30 +3,14 @@ import { and, asc, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { matterNotes, matterTasks, matters, timeEntries } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
-
-const VALID_TYPES = [
-  'Corporate',
-  'Employment',
-  'Property',
-  'Dispute',
-  'Contract',
-  'IP',
-] as const
-
-const VALID_STATUSES = ['open', 'in_progress', 'on_hold', 'closed'] as const
-const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const
-
-function normalizeString(value: unknown) {
-  return typeof value === 'string' ? value.trim() : ''
-}
-
-function parseOptionalDate(value: unknown) {
-  const normalized = normalizeString(value)
-  if (!normalized) return null
-
-  const parsed = new Date(normalized)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
+import {
+  isInArray,
+  MATTER_PRIORITIES,
+  MATTER_STATUSES,
+  MATTER_TYPES,
+  normalizeString,
+  parseOptionalDate,
+} from '@/lib/legal'
 
 async function getScopedMatter(id: string, tenantId: string) {
   const rows = await db
@@ -103,7 +87,7 @@ export async function PATCH(
 
   if ('type' in body) {
     const type = normalizeString(body.type)
-    if (!VALID_TYPES.includes(type as (typeof VALID_TYPES)[number])) {
+    if (!isInArray(type, MATTER_TYPES)) {
       return NextResponse.json(
         { error: 'Matter type is invalid' },
         { status: 400 }
@@ -136,7 +120,7 @@ export async function PATCH(
 
   if ('status' in body) {
     const status = normalizeString(body.status).toLowerCase()
-    if (!VALID_STATUSES.includes(status as (typeof VALID_STATUSES)[number])) {
+    if (!isInArray(status, MATTER_STATUSES)) {
       return NextResponse.json({ error: 'Status is invalid' }, { status: 400 })
     }
     updates.status = status
@@ -144,9 +128,7 @@ export async function PATCH(
 
   if ('priority' in body) {
     const priority = normalizeString(body.priority).toLowerCase()
-    if (
-      !VALID_PRIORITIES.includes(priority as (typeof VALID_PRIORITIES)[number])
-    ) {
+    if (!isInArray(priority, MATTER_PRIORITIES)) {
       return NextResponse.json(
         { error: 'Priority is invalid' },
         { status: 400 }
@@ -164,6 +146,17 @@ export async function PATCH(
       )
     }
     updates.dueDate = dueDate
+  }
+
+  if ('billingRatePerHour' in body) {
+    const billingRatePerHour = Number(body.billingRatePerHour)
+    if (!Number.isFinite(billingRatePerHour) || billingRatePerHour <= 0) {
+      return NextResponse.json(
+        { error: 'Billing rate per hour is invalid' },
+        { status: 400 }
+      )
+    }
+    updates.billingRatePerHour = Math.round(billingRatePerHour * 100)
   }
 
   const [matter] = await db
