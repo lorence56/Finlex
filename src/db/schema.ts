@@ -1,5 +1,6 @@
 import {
   boolean,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -425,6 +426,154 @@ export const tenantSettings = pgTable(
   (table) => [index('tenant_settings_currency_idx').on(table.currency)]
 )
 
+// ============================================
+// CHART OF ACCOUNTS
+// ============================================
+export const accounts = pgTable(
+  'accounts',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    type: text('type').notNull(),
+    parentId: text('parent_id'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.parentId],
+      foreignColumns: [table.id],
+      name: 'accounts_parent_id_fk',
+    }).onDelete('set null'),
+    index('accounts_tenant_id_idx').on(table.tenantId),
+    index('accounts_code_idx').on(table.code),
+    index('accounts_parent_id_idx').on(table.parentId),
+  ]
+)
+
+export const journalEntries = pgTable(
+  'journal_entries',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    reference: text('reference'),
+    description: text('description').notNull(),
+    date: timestamp('date').notNull().defaultNow(),
+    status: text('status').notNull().default('draft'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('journal_entries_tenant_id_idx').on(table.tenantId),
+    index('journal_entries_date_idx').on(table.date),
+    index('journal_entries_status_idx').on(table.status),
+  ]
+)
+
+export const journalLines = pgTable(
+  'journal_lines',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    journalEntryId: text('journal_entry_id')
+      .notNull()
+      .references(() => journalEntries.id, { onDelete: 'cascade' }),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    debit: integer('debit').notNull().default(0),
+    credit: integer('credit').notNull().default(0),
+    description: text('description'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('journal_lines_journal_entry_id_idx').on(table.journalEntryId),
+    index('journal_lines_account_id_idx').on(table.accountId),
+  ]
+)
+
+export const fiscalPeriods = pgTable(
+  'fiscal_periods',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    startDate: timestamp('start_date').notNull(),
+    endDate: timestamp('end_date').notNull(),
+    isClosed: boolean('is_closed').notNull().default(false),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [index('fiscal_periods_tenant_id_idx').on(table.tenantId)]
+)
+
+// ============================================
+// INVOICES
+// ============================================
+export const invoices = pgTable(
+  'invoices',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    clientName: text('client_name').notNull(),
+    clientEmail: text('client_email').notNull(),
+    invoiceNo: text('invoice_no').notNull(),
+    status: text('status').notNull().default('draft'),
+    dueDate: timestamp('due_date').notNull(),
+    subtotal: integer('subtotal').notNull().default(0),
+    taxAmount: integer('tax_amount').notNull().default(0),
+    total: integer('total').notNull().default(0),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('invoices_tenant_id_idx').on(table.tenantId),
+    index('invoices_invoice_no_idx').on(table.invoiceNo),
+    index('invoices_status_idx').on(table.status),
+  ]
+)
+
+export const invoiceLines = pgTable(
+  'invoice_lines',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    invoiceId: text('invoice_id')
+      .notNull()
+      .references(() => invoices.id, { onDelete: 'cascade' }),
+    description: text('description').notNull(),
+    quantity: integer('quantity').notNull().default(1),
+    unitPrice: integer('unit_price').notNull().default(0),
+    taxRate: integer('tax_rate').notNull().default(0),
+    lineTotal: integer('line_total').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [index('invoice_lines_invoice_id_idx').on(table.invoiceId)]
+)
+
 export type Matter = typeof matters.$inferSelect
 export type NewMatter = typeof matters.$inferInsert
 export type MatterTask = typeof matterTasks.$inferSelect
@@ -436,3 +585,15 @@ export type NewClient = typeof clients.$inferInsert
 export type Document = typeof documents.$inferSelect
 export type AccountingEntry = typeof accountingEntries.$inferSelect
 export type TenantSettings = typeof tenantSettings.$inferSelect
+export type Account = typeof accounts.$inferSelect
+export type NewAccount = typeof accounts.$inferInsert
+export type JournalEntry = typeof journalEntries.$inferSelect
+export type NewJournalEntry = typeof journalEntries.$inferInsert
+export type JournalLine = typeof journalLines.$inferSelect
+export type NewJournalLine = typeof journalLines.$inferInsert
+export type FiscalPeriod = typeof fiscalPeriods.$inferSelect
+export type NewFiscalPeriod = typeof fiscalPeriods.$inferInsert
+export type Invoice = typeof invoices.$inferSelect
+export type NewInvoice = typeof invoices.$inferInsert
+export type InvoiceLine = typeof invoiceLines.$inferSelect
+export type NewInvoiceLine = typeof invoiceLines.$inferInsert
