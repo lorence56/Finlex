@@ -7,6 +7,9 @@ import {
   FileText,
   Layers,
   Link as LinkIcon,
+  PieChart,
+  Receipt,
+  Users,
   Wallet,
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -175,7 +178,7 @@ export default function AccountingPage() {
             <Badge label="Live" variant="green" />
           </div>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <Link
               href="/dashboard/accounting/journal"
               className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
@@ -198,6 +201,42 @@ export default function AccountingPage() {
               </div>
               <p className="mt-3 text-slate-500">
                 Create and track invoices with automated totals.
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/accounting/payroll"
+              className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
+            >
+              <div className="flex items-center gap-3">
+                <Users size={18} />
+                Payroll
+              </div>
+              <p className="mt-3 text-slate-500">
+                Kenya PAYE, NHIF, NSSF and monthly payroll runs.
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/accounting/reports"
+              className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
+            >
+              <div className="flex items-center gap-3">
+                <PieChart size={18} />
+                Financial reports
+              </div>
+              <p className="mt-3 text-slate-500">
+                P&amp;L, balance sheet, cash flow, and Recharts trends.
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/accounting/tax"
+              className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
+            >
+              <div className="flex items-center gap-3">
+                <Receipt size={18} />
+                Tax desk
+              </div>
+              <p className="mt-3 text-slate-500">
+                VAT, PAYE, corporation tax, and mock iTAX submissions.
               </p>
             </Link>
           </div>

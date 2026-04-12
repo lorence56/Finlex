@@ -6,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core'
 
 // ============================================
@@ -574,6 +575,129 @@ export const invoiceLines = pgTable(
   (table) => [index('invoice_lines_invoice_id_idx').on(table.invoiceId)]
 )
 
+// ============================================
+// PAYROLL (Kenya — gross & statutory in KES shillings)
+// ============================================
+export const employees = pgTable(
+  'employees',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    fullName: text('full_name').notNull(),
+    idNumber: text('id_number'),
+    kraPin: text('kra_pin'),
+    nhifNo: text('nhif_no'),
+    nssfNo: text('nssf_no'),
+    grossSalary: integer('gross_salary').notNull(),
+    bankAccount: text('bank_account'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [index('employees_tenant_id_idx').on(table.tenantId)]
+)
+
+export const payrollRuns = pgTable(
+  'payroll_runs',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    period: text('period').notNull(),
+    status: text('status').notNull().default('completed'),
+    runAt: timestamp('run_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('payroll_runs_tenant_id_idx').on(table.tenantId),
+    index('payroll_runs_period_idx').on(table.period),
+  ]
+)
+
+export const payrollLines = pgTable(
+  'payroll_lines',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    payrollRunId: text('payroll_run_id')
+      .notNull()
+      .references(() => payrollRuns.id, { onDelete: 'cascade' }),
+    employeeId: text('employee_id')
+      .notNull()
+      .references(() => employees.id, { onDelete: 'cascade' }),
+    gross: integer('gross').notNull(),
+    paye: integer('paye').notNull(),
+    nhif: integer('nhif').notNull(),
+    nssf: integer('nssf').notNull(),
+    netPay: integer('net_pay').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('payroll_lines_payroll_run_id_idx').on(table.payrollRunId),
+    index('payroll_lines_employee_id_idx').on(table.employeeId),
+  ]
+)
+
+// ============================================
+// TAX RETURNS & MOCK iTAX AUDIT TRAIL
+// ============================================
+export const taxReturns = pgTable(
+  'tax_returns',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    period: text('period').notNull(),
+    status: text('status').notNull().default('draft'),
+    dueDate: timestamp('due_date').notNull(),
+    amount: integer('amount').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('tax_returns_tenant_id_idx').on(table.tenantId),
+    index('tax_returns_due_date_idx').on(table.dueDate),
+    uniqueIndex('tax_returns_tenant_type_period_uidx').on(
+      table.tenantId,
+      table.type,
+      table.period
+    ),
+  ]
+)
+
+export const itaxSubmissions = pgTable(
+  'itax_submissions',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    taxReturnId: text('tax_return_id').references(() => taxReturns.id, {
+      onDelete: 'set null',
+    }),
+    referenceNo: text('reference_no').notNull(),
+    status: text('status').notNull(),
+    payload: text('payload').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('itax_submissions_tenant_id_idx').on(table.tenantId),
+    index('itax_submissions_tax_return_id_idx').on(table.taxReturnId),
+  ]
+)
+
 export type Matter = typeof matters.$inferSelect
 export type NewMatter = typeof matters.$inferInsert
 export type MatterTask = typeof matterTasks.$inferSelect
@@ -597,3 +721,13 @@ export type Invoice = typeof invoices.$inferSelect
 export type NewInvoice = typeof invoices.$inferInsert
 export type InvoiceLine = typeof invoiceLines.$inferSelect
 export type NewInvoiceLine = typeof invoiceLines.$inferInsert
+export type Employee = typeof employees.$inferSelect
+export type NewEmployee = typeof employees.$inferInsert
+export type PayrollRun = typeof payrollRuns.$inferSelect
+export type NewPayrollRun = typeof payrollRuns.$inferInsert
+export type PayrollLine = typeof payrollLines.$inferSelect
+export type NewPayrollLine = typeof payrollLines.$inferInsert
+export type TaxReturn = typeof taxReturns.$inferSelect
+export type NewTaxReturn = typeof taxReturns.$inferInsert
+export type ItaxSubmission = typeof itaxSubmissions.$inferSelect
+export type NewItaxSubmission = typeof itaxSubmissions.$inferInsert
