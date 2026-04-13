@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
+import { del } from '@vercel/blob'
 import { documents } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
 import { normalizeString } from '@/lib/legal'
 
-const DOCUMENT_STATUSES = ['draft', 'in_review', 'approved', 'archived'] as const
+const DOCUMENT_STATUSES = [
+  'draft',
+  'in_review',
+  'approved',
+  'archived',
+] as const
 
 function isValidStatus(value: string) {
   return DOCUMENT_STATUSES.includes(value as (typeof DOCUMENT_STATUSES)[number])
@@ -45,7 +51,10 @@ export async function PATCH(
   if ('title' in body) {
     const title = normalizeString(body.title)
     if (!title) {
-      return NextResponse.json({ error: 'Document title is required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Document title is required' },
+        { status: 400 }
+      )
     }
     updates.title = title
   }
@@ -53,12 +62,20 @@ export async function PATCH(
   if ('status' in body) {
     const status = normalizeString(body.status).toLowerCase()
     if (!isValidStatus(status)) {
-      return NextResponse.json({ error: 'Document status is invalid' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Document status is invalid' },
+        { status: 400 }
+      )
     }
     updates.status = status
   }
 
   if ('fileUrl' in body) updates.fileUrl = normalizeString(body.fileUrl) || null
+  if ('blobUrl' in body) updates.blobUrl = normalizeString(body.blobUrl) || null
+  if ('blobKey' in body) updates.blobKey = normalizeString(body.blobKey) || null
+  if ('mimeType' in body)
+    updates.mimeType = normalizeString(body.mimeType) || null
+  if ('sizeBytes' in body) updates.sizeBytes = Number(body.sizeBytes) || null
 
   const [document] = await db
     .update(documents)
@@ -83,6 +100,19 @@ export async function DELETE(
 
   if (!existing) {
     return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+  }
+
+  if (existing.blobKey) {
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN
+
+    if (blobToken) {
+      try {
+        await del(existing.blobKey, { token: blobToken })
+      } catch (error) {
+        // If blob deletion fails, still allow document delete to proceed.
+        console.error('Failed to remove blob file', error)
+      }
+    }
   }
 
   await db

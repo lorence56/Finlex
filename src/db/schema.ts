@@ -353,10 +353,17 @@ export const documents = pgTable(
     clientId: text('client_id').references(() => clients.id, {
       onDelete: 'set null',
     }),
+    companyId: text('company_id').references(() => companies.id, {
+      onDelete: 'set null',
+    }),
     title: text('title').notNull(),
     category: text('category').notNull().default('general'),
     status: text('status').notNull().default('draft'),
     fileUrl: text('file_url'),
+    blobUrl: text('blob_url'),
+    blobKey: text('blob_key'),
+    mimeType: text('mime_type'),
+    sizeBytes: integer('size_bytes'),
     uploadedBy: text('uploaded_by').references(() => users.id, {
       onDelete: 'set null',
     }),
@@ -367,6 +374,7 @@ export const documents = pgTable(
     index('documents_tenant_id_idx').on(table.tenantId),
     index('documents_matter_id_idx').on(table.matterId),
     index('documents_client_id_idx').on(table.clientId),
+    index('documents_company_id_idx').on(table.companyId),
     index('documents_status_idx').on(table.status),
   ]
 )

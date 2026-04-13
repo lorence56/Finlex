@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
+import { put } from '@vercel/blob'
 import { db } from '@/lib/db'
 import { clients, companies, documents, matters } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
@@ -29,41 +30,8 @@ function isValidStatus(value: string) {
   return DOCUMENT_STATUSES.includes(value as (typeof DOCUMENT_STATUSES)[number])
 }
 
-export async function GET() {
-  const dbUser = await getCurrentDbUser()
-  if (!dbUser) {
-    return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  }
-
-  const rows = await db
-    .select({
-      id: documents.id,
-      title: documents.title,
-      category: documents.category,
-      status: documents.status,
-      fileUrl: documents.fileUrl,
-      blobUrl: documents.blobUrl,
-      blobKey: documents.blobKey,
-      mimeType: documents.mimeType,
-      sizeBytes: documents.sizeBytes,
-      matterId: documents.matterId,
-      clientId: documents.clientId,
-      companyId: documents.companyId,
-      uploadedBy: documents.uploadedBy,
-      createdAt: documents.createdAt,
-      updatedAt: documents.updatedAt,
-      matterType: matters.type,
-      clientName: clients.fullName,
-      companyName: companies.name,
-    })
-    .from(documents)
-    .leftJoin(matters, eq(documents.matterId, matters.id))
-    .leftJoin(clients, eq(documents.clientId, clients.id))
-    .leftJoin(companies, eq(documents.companyId, companies.id))
-    .where(eq(documents.tenantId, dbUser.tenantId))
-    .orderBy(desc(documents.createdAt))
-
-  return NextResponse.json({ documents: rows })
+function sanitizeFileName(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120)
 }
 
 export async function POST(request: Request) {
@@ -72,18 +40,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
-  const body = await request.json()
-  const title = normalizeString(body.title)
-  const category = normalizeString(body.category || 'general').toLowerCase()
-  const status = normalizeString(body.status || 'draft').toLowerCase()
-  const fileUrl = normalizeString(body.fileUrl)
-  const matterId = normalizeString(body.matterId)
-  const clientId = normalizeString(body.clientId)
-  const companyId = normalizeString(body.companyId)
-  const blobUrl = normalizeString(body.blobUrl)
-  const blobKey = normalizeString(body.blobKey)
-  const mimeType = normalizeString(body.mimeType)
-  const sizeBytes = Number(body.sizeBytes) || null
+  const formData = await request.formData()
+  const title = normalizeString(String(formData.get('title') || ''))
+  const category = normalizeString(
+    String(formData.get('category') || 'general')
+  ).toLowerCase()
+  const status = normalizeString(
+    String(formData.get('status') || 'draft')
+  ).toLowerCase()
+  const fileUrl = normalizeString(String(formData.get('fileUrl') || ''))
+  const matterId = normalizeString(String(formData.get('matterId') || ''))
+  const clientId = normalizeString(String(formData.get('clientId') || ''))
+  const companyId = normalizeString(String(formData.get('companyId') || ''))
+  const fileValue = formData.get('file')
+  const fileObject =
+    fileValue instanceof File
+      ? fileValue
+      : fileValue instanceof Blob
+        ? fileValue
+        : null
 
   if (!title) {
     return NextResponse.json(
@@ -151,6 +126,43 @@ export async function POST(request: Request) {
     }
   }
 
+  let blobUrl: string | null = null
+  let blobKey: string | null = null
+  let mimeType: string | null = null
+  let sizeBytes: number | null = null
+  let finalFileUrl = fileUrl || null
+
+  if (fileObject) {
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN
+    if (!blobToken) {
+      return NextResponse.json(
+        { error: 'Blob storage is not configured' },
+        { status: 500 }
+      )
+    }
+
+    const filename = sanitizeFileName(
+      fileObject instanceof File
+        ? fileObject.name
+        : `document-${crypto.randomUUID()}`
+    )
+    const pathname = `documents/${dbUser.tenantId}/${crypto.randomUUID()}-${filename}`
+
+    const uploadedBlob = await put(pathname, fileObject, {
+      access: 'public',
+      contentType: fileObject.type || 'application/octet-stream',
+      token: blobToken,
+      addRandomSuffix: true,
+      multipart: true,
+    })
+
+    blobUrl = uploadedBlob.url
+    blobKey = uploadedBlob.pathname
+    mimeType = uploadedBlob.contentType
+    sizeBytes = uploadedBlob.size
+    finalFileUrl = uploadedBlob.url
+  }
+
   const [document] = await db
     .insert(documents)
     .values({
@@ -158,10 +170,10 @@ export async function POST(request: Request) {
       title,
       category,
       status,
-      fileUrl: fileUrl || null,
-      blobUrl: blobUrl || null,
-      blobKey: blobKey || null,
-      mimeType: mimeType || null,
+      fileUrl: finalFileUrl,
+      blobUrl,
+      blobKey,
+      mimeType,
       sizeBytes,
       matterId: matterId || null,
       clientId: clientId || null,
