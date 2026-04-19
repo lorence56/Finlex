@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { and, asc, eq } from 'drizzle-orm'
 import { ArrowLeft } from 'lucide-react'
 import { db } from '@/lib/db'
-import { matterNotes, matterTasks, matters, timeEntries } from '@/db/schema'
+import { clients, matterNotes, matterTasks, matters, timeEntries } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { MatterDetailClient } from '@/components/legal/MatterDetailClient'
@@ -19,13 +19,18 @@ export default async function MatterDetailPage({
   const { id } = await params
 
   const rows = await db
-    .select()
+    .select({
+      matter: matters,
+      clientName: clients.name,
+    })
     .from(matters)
+    .leftJoin(clients, eq(clients.id, matters.clientId))
     .where(and(eq(matters.id, id), eq(matters.tenantId, dbUser.tenantId)))
     .limit(1)
 
-  const matter = rows[0]
-  if (!matter) redirect('/dashboard/legal')
+  const result = rows[0]
+  if (!result) redirect('/dashboard/legal')
+  const matter = result.matter
 
   const [tasks, notes, entries] = await Promise.all([
     db
@@ -60,7 +65,10 @@ export default async function MatterDetailPage({
       />
 
       <MatterDetailClient
-        matter={matter}
+        matter={{
+          ...matter,
+          clientId: result.clientName || matter.clientId,
+        }}
         initialTasks={tasks}
         initialNotes={notes}
         initialEntries={entries}

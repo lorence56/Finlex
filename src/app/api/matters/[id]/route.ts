@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { and, asc, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { matterNotes, matterTasks, matters, timeEntries } from '@/db/schema'
+import { clients, matterNotes, matterTasks, matters, timeEntries } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
 import {
   isInArray,
@@ -96,15 +96,26 @@ export async function PATCH(
     updates.type = type
   }
 
-  if ('clientName' in body) {
-    const clientName = normalizeString(body.clientName)
-    if (!clientName) {
+  if ('clientId' in body || 'clientName' in body) {
+    const clientId = normalizeString(body.clientId || body.clientName)
+    if (!clientId) {
       return NextResponse.json(
-        { error: 'Client name is required' },
+        { error: 'Client is required' },
         { status: 400 }
       )
     }
-    updates.clientId = clientName
+
+    const [client] = await db
+      .select({ id: clients.id })
+      .from(clients)
+      .where(and(eq(clients.id, clientId), eq(clients.tenantId, dbUser.tenantId)))
+      .limit(1)
+
+    if (!client) {
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+    }
+
+    updates.clientId = clientId
   }
 
   if ('description' in body) {

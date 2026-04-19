@@ -251,6 +251,45 @@ export const matterNotes = pgTable(
   ]
 )
 
+export const messages = pgTable(
+  'messages',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    matterId: text('matter_id')
+      .notNull()
+      .references(() => matters.id, { onDelete: 'cascade' }),
+    senderId: text('sender_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    body: text('body').notNull(),
+    isClientVisible: boolean('is_client_visible').notNull().default(true),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('messages_matter_id_idx').on(table.matterId),
+    index('messages_sender_id_idx').on(table.senderId),
+    index('messages_created_at_idx').on(table.createdAt),
+  ]
+)
+
+export const messageAttachments = pgTable(
+  'message_attachments',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    messageId: text('message_id')
+      .notNull()
+      .references(() => messages.id, { onDelete: 'cascade' }),
+    blobUrl: text('blob_url').notNull(),
+    filename: text('filename').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [index('message_attachments_message_id_idx').on(table.messageId)]
+)
+
 // ============================================
 // TIME ENTRIES
 // ============================================
@@ -318,21 +357,38 @@ export const clients = pgTable(
     tenantId: text('tenant_id')
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
-    fullName: text('full_name').notNull(),
-    email: text('email'),
+    name: text('name').notNull(),
+    email: text('email').notNull(),
     phone: text('phone'),
-    companyName: text('company_name'),
-    type: text('type').notNull().default('corporate'),
-    status: text('status').notNull().default('active'),
-    notes: text('notes'),
+    type: text('type').notNull().default('individual'),
+    kycStatus: text('kyc_status').notNull().default('pending'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   (table) => [
     index('clients_tenant_id_idx').on(table.tenantId),
-    index('clients_status_idx').on(table.status),
+    index('clients_name_idx').on(table.name),
+    index('clients_kyc_status_idx').on(table.kycStatus),
     index('clients_email_idx').on(table.email),
   ]
+)
+
+export const clientContacts = pgTable(
+  'client_contacts',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    clientId: text('client_id')
+      .notNull()
+      .references(() => clients.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    role: text('role'),
+    email: text('email'),
+    phone: text('phone'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [index('client_contacts_client_id_idx').on(table.clientId)]
 )
 
 // ============================================
@@ -714,6 +770,12 @@ export type TimeEntry = typeof timeEntries.$inferSelect
 export type Contract = typeof contracts.$inferSelect
 export type Client = typeof clients.$inferSelect
 export type NewClient = typeof clients.$inferInsert
+export type ClientContact = typeof clientContacts.$inferSelect
+export type NewClientContact = typeof clientContacts.$inferInsert
+export type Message = typeof messages.$inferSelect
+export type NewMessage = typeof messages.$inferInsert
+export type MessageAttachment = typeof messageAttachments.$inferSelect
+export type NewMessageAttachment = typeof messageAttachments.$inferInsert
 export type Document = typeof documents.$inferSelect
 export type AccountingEntry = typeof accountingEntries.$inferSelect
 export type TenantSettings = typeof tenantSettings.$inferSelect

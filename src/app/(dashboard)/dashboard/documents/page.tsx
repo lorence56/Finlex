@@ -25,7 +25,7 @@ type DocumentForm = {
   fileUrl: string
 }
 
-type ClientRecord = { id: string; fullName: string }
+type ClientRecord = { id: string; name: string }
 type MatterRecord = { id: string; type: string; clientId: string }
 
 type CompanyRecord = { id: string; name: string }
@@ -104,7 +104,7 @@ export default function DocumentsPage() {
         setClients(
           (clientsData.clients || []).map((client: ClientRecord) => ({
             id: client.id,
-            label: client.fullName,
+            label: client.name,
           }))
         )
         setMatters(

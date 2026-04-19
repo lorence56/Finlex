@@ -17,6 +17,7 @@ import {
 } from 'date-fns'
 import { Badge } from '@/components/ui/Badge'
 import { Tabs } from '@/components/ui/Tabs'
+import { MessageThread } from '@/components/ui/MessageThread'
 import type { Matter, MatterNote, MatterTask, TimeEntry } from '@/db/schema'
 import { TaskChecklist } from '@/components/legal/TaskChecklist'
 import { MatterNotesPanel } from '@/components/legal/MatterNotesPanel'
@@ -30,7 +31,7 @@ type MatterDetailClientProps = {
   initialEntries: TimeEntry[]
 }
 
-type TabId = 'overview' | 'tasks' | 'notes' | 'time' | 'billing'
+type TabId = 'overview' | 'tasks' | 'notes' | 'time' | 'billing' | 'messages'
 
 const TAB_ITEMS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -38,6 +39,7 @@ const TAB_ITEMS: { id: TabId; label: string }[] = [
   { id: 'notes', label: 'Notes' },
   { id: 'time', label: 'Time' },
   { id: 'billing', label: 'Billing' },
+  { id: 'messages', label: 'Messages' },
 ]
 
 function getStatusVariant(status: string) {
@@ -411,6 +413,10 @@ export function MatterDetailClient({
               </p>
             </div>
           </div>
+        )}
+
+        {tab === 'messages' && (
+          <MessageThread matterId={matter.id} allowVisibilityToggle />
         )}
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { matters } from '@/db/schema'
+import { clients, matters } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
 import {
   isInArray,
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
   const body = await request.json()
   const type = normalizeString(body.type)
-  const clientName = normalizeString(body.clientName)
+  const clientId = normalizeString(body.clientId || body.clientName)
   const description = normalizeString(body.description)
   const priority = normalizeString(body.priority).toLowerCase()
   const dueDate = parseOptionalDate(body.dueDate)
@@ -51,9 +51,9 @@ export async function POST(request: Request) {
     )
   }
 
-  if (!clientName) {
+  if (!clientId) {
     return NextResponse.json(
-      { error: 'Client name is required' },
+      { error: 'Client is required' },
       { status: 400 }
     )
   }
@@ -75,11 +75,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Due date is invalid' }, { status: 400 })
   }
 
+  const [client] = await db
+    .select({ id: clients.id })
+    .from(clients)
+    .where(and(eq(clients.id, clientId), eq(clients.tenantId, dbUser.tenantId)))
+    .limit(1)
+
+  if (!client) {
+    return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+  }
+
   const [matter] = await db
     .insert(matters)
     .values({
       tenantId: dbUser.tenantId,
-      clientId: clientName,
+      clientId,
       assignedTo: dbUser.id,
       type,
       status: 'open',

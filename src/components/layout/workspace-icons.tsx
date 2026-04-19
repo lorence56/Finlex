@@ -1,0 +1,43 @@
+import type { LucideIcon } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  BadgeDollarSign,
+  BriefcaseBusiness,
+  Building2,
+  Calculator,
+  FileText,
+  Folders,
+  Landmark,
+  LayoutDashboard,
+  LineChart,
+  Network,
+  Scale,
+  ScrollText,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  Wallet,
+} from 'lucide-react'
+import type { WorkspaceIconName } from '@/lib/workspaces'
+
+export const workspaceIcons: Record<WorkspaceIconName, LucideIcon> = {
+  'arrow-left-right': ArrowLeftRight,
+  'badge-dollar-sign': BadgeDollarSign,
+  'briefcase-business': BriefcaseBusiness,
+  'building-2': Building2,
+  calculator: Calculator,
+  'file-text': FileText,
+  folders: Folders,
+  landmark: Landmark,
+  'layout-dashboard': LayoutDashboard,
+  'line-chart': LineChart,
+  network: Network,
+  scale: Scale,
+  'scroll-text': ScrollText,
+  settings: Settings,
+  'shield-check': ShieldCheck,
+  sparkles: Sparkles,
+  users: Users,
+  wallet: Wallet,
+}

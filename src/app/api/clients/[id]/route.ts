@@ -1,19 +1,29 @@
 import { NextResponse } from 'next/server'
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq, ilike, inArray, or } from 'drizzle-orm'
+import {
+  clientContacts,
+  clients,
+  companies,
+  documents,
+  invoices,
+  matters,
+} from '@/db/schema'
 import { db } from '@/lib/db'
-import { clients } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
+import {
+  CLIENT_KYC_STATUSES,
+  CLIENT_TYPES,
+  isClientKycStatus,
+  isClientType,
+} from '@/lib/clients'
 import { normalizeString } from '@/lib/legal'
 
-const CLIENT_TYPES = ['corporate', 'individual'] as const
-const CLIENT_STATUSES = ['active', 'inactive', 'prospect'] as const
-
-function isValidType(value: string) {
-  return CLIENT_TYPES.includes(value as (typeof CLIENT_TYPES)[number])
-}
-
-function isValidStatus(value: string) {
-  return CLIENT_STATUSES.includes(value as (typeof CLIENT_STATUSES)[number])
+type ContactPayload = {
+  id?: unknown
+  name?: unknown
+  role?: unknown
+  email?: unknown
+  phone?: unknown
 }
 
 async function getScopedClient(id: string, tenantId: string) {
@@ -24,6 +34,76 @@ async function getScopedClient(id: string, tenantId: string) {
     .limit(1)
 
   return rows[0] ?? null
+}
+
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const dbUser = await getCurrentDbUser()
+  if (!dbUser) {
+    return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  }
+
+  const { id } = await context.params
+  const client = await getScopedClient(id, dbUser.tenantId)
+
+  if (!client) {
+    return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+  }
+
+  const [contacts, linkedMatters, linkedDocuments, linkedInvoices, linkedCompanies] =
+    await Promise.all([
+      db
+        .select()
+        .from(clientContacts)
+        .where(eq(clientContacts.clientId, client.id))
+        .orderBy(asc(clientContacts.createdAt)),
+      db
+        .select()
+        .from(matters)
+        .where(
+          and(
+            eq(matters.tenantId, dbUser.tenantId),
+            or(eq(matters.clientId, client.id), eq(matters.clientId, client.name))
+          )
+        )
+        .orderBy(asc(matters.createdAt)),
+      db
+        .select()
+        .from(documents)
+        .where(and(eq(documents.tenantId, dbUser.tenantId), eq(documents.clientId, client.id)))
+        .orderBy(asc(documents.createdAt)),
+      db
+        .select()
+        .from(invoices)
+        .where(
+          and(
+            eq(invoices.tenantId, dbUser.tenantId),
+            or(eq(invoices.clientEmail, client.email), eq(invoices.clientName, client.name))
+          )
+        )
+        .orderBy(asc(invoices.createdAt)),
+      db
+        .select()
+        .from(companies)
+        .where(
+          and(
+            eq(companies.tenantId, dbUser.tenantId),
+            ilike(companies.name, `%${client.name}%`)
+          )
+        )
+        .orderBy(asc(companies.createdAt)),
+    ])
+
+  return NextResponse.json({
+    client,
+    contacts,
+    linkedMatters,
+    linkedDocuments,
+    linkedInvoices,
+    linkedCompanies,
+  })
 }
 
 export async function PATCH(
@@ -47,34 +127,52 @@ export async function PATCH(
     updatedAt: new Date(),
   }
 
-  if ('fullName' in body) {
-    const fullName = normalizeString(body.fullName)
-    if (!fullName) {
-      return NextResponse.json({ error: 'Client full name is required' }, { status: 400 })
+  if ('name' in body) {
+    const name = normalizeString(body.name)
+    if (!name) {
+      return NextResponse.json({ error: 'Client name is required' }, { status: 400 })
     }
-    updates.fullName = fullName
+    updates.name = name
+  }
+
+  if ('email' in body) {
+    const email = normalizeString(body.email).toLowerCase()
+    if (!email || !email.includes('@')) {
+      return NextResponse.json(
+        { error: 'A valid client email is required' },
+        { status: 400 }
+      )
+    }
+    updates.email = email
+  }
+
+  if ('phone' in body) {
+    updates.phone = normalizeString(body.phone) || null
   }
 
   if ('type' in body) {
     const type = normalizeString(body.type).toLowerCase()
-    if (!isValidType(type)) {
-      return NextResponse.json({ error: 'Client type is invalid' }, { status: 400 })
+    if (!isClientType(type)) {
+      return NextResponse.json(
+        { error: `Client type must be one of ${CLIENT_TYPES.join(', ')}` },
+        { status: 400 }
+      )
     }
     updates.type = type
   }
 
-  if ('status' in body) {
-    const status = normalizeString(body.status).toLowerCase()
-    if (!isValidStatus(status)) {
-      return NextResponse.json({ error: 'Client status is invalid' }, { status: 400 })
+  if ('kycStatus' in body) {
+    const kycStatus = normalizeString(body.kycStatus).toLowerCase()
+    if (!isClientKycStatus(kycStatus)) {
+      return NextResponse.json(
+        {
+          error: `KYC status must be one of ${CLIENT_KYC_STATUSES.join(', ')}`,
+        },
+        { status: 400 }
+      )
     }
-    updates.status = status
+    updates.kycStatus = kycStatus
   }
-
-  if ('email' in body) updates.email = normalizeString(body.email) || null
-  if ('phone' in body) updates.phone = normalizeString(body.phone) || null
-  if ('companyName' in body) updates.companyName = normalizeString(body.companyName) || null
-  if ('notes' in body) updates.notes = normalizeString(body.notes) || null
 
   const [client] = await db
     .update(clients)
@@ -82,28 +180,60 @@ export async function PATCH(
     .where(and(eq(clients.id, id), eq(clients.tenantId, dbUser.tenantId)))
     .returning()
 
-  return NextResponse.json({ client })
-}
+  if ('contacts' in body && Array.isArray(body.contacts)) {
+    const payload = body.contacts as ContactPayload[]
+    const existingContacts = await db
+      .select()
+      .from(clientContacts)
+      .where(eq(clientContacts.clientId, id))
 
-export async function DELETE(
-  _request: Request,
-  context: { params: Promise<{ id: string }> }
-) {
-  const dbUser = await getCurrentDbUser()
-  if (!dbUser) {
-    return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+    const keepIds = payload
+      .map((contact) =>
+        typeof contact.id === 'string' && contact.id.trim() ? contact.id.trim() : null
+      )
+      .filter((value): value is string => Boolean(value))
+
+    const staleIds = existingContacts
+      .map((contact) => contact.id)
+      .filter((contactId) => !keepIds.includes(contactId))
+
+    if (staleIds.length > 0) {
+      await db.delete(clientContacts).where(inArray(clientContacts.id, staleIds))
+    }
+
+    for (const contact of payload) {
+      const name = normalizeString(contact.name)
+      if (!name) continue
+
+      const record = {
+        name,
+        role: normalizeString(contact.role) || null,
+        email: normalizeString(contact.email).toLowerCase() || null,
+        phone: normalizeString(contact.phone) || null,
+      }
+
+      const contactId =
+        typeof contact.id === 'string' && contact.id.trim() ? contact.id.trim() : null
+
+      if (contactId) {
+        await db
+          .update(clientContacts)
+          .set(record)
+          .where(and(eq(clientContacts.id, contactId), eq(clientContacts.clientId, id)))
+      } else {
+        await db.insert(clientContacts).values({
+          clientId: id,
+          ...record,
+        })
+      }
+    }
   }
 
-  const { id } = await context.params
-  const existing = await getScopedClient(id, dbUser.tenantId)
+  const contacts = await db
+    .select()
+    .from(clientContacts)
+    .where(eq(clientContacts.clientId, client.id))
+    .orderBy(asc(clientContacts.createdAt))
 
-  if (!existing) {
-    return NextResponse.json({ error: 'Client not found' }, { status: 404 })
-  }
-
-  await db
-    .delete(clients)
-    .where(and(eq(clients.id, id), eq(clients.tenantId, dbUser.tenantId)))
-
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ client, contacts })
 }

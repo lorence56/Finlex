@@ -53,12 +53,7 @@ export async function POST(request: Request) {
   const clientId = normalizeString(String(formData.get('clientId') || ''))
   const companyId = normalizeString(String(formData.get('companyId') || ''))
   const fileValue = formData.get('file')
-  const fileObject =
-    fileValue instanceof File
-      ? fileValue
-      : fileValue instanceof Blob
-        ? fileValue
-        : null
+  const fileObject = fileValue instanceof File ? fileValue : null
 
   if (!title) {
     return NextResponse.json(
@@ -159,7 +154,7 @@ export async function POST(request: Request) {
     blobUrl = uploadedBlob.url
     blobKey = uploadedBlob.pathname
     mimeType = uploadedBlob.contentType
-    sizeBytes = uploadedBlob.size
+    sizeBytes = fileObject.size
     finalFileUrl = uploadedBlob.url
   }
 

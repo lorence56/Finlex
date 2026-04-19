@@ -53,7 +53,7 @@ export async function GET() {
       createdAt: documents.createdAt,
       updatedAt: documents.updatedAt,
       matterType: matters.type,
-      clientName: clients.fullName,
+      clientName: clients.name,
       companyName: companies.name,
     })
     .from(documents)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Scale } from 'lucide-react'
@@ -22,18 +22,45 @@ const PRIORITIES = [
   { value: 'urgent', label: 'Urgent' },
 ]
 
+type ClientRecord = {
+  id: string
+  name: string
+}
+
 export default function NewMatterPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [loadingClients, setLoadingClients] = useState(true)
   const [error, setError] = useState('')
+  const [clients, setClients] = useState<ClientRecord[]>([])
   const [form, setForm] = useState({
     type: 'Corporate',
-    clientName: '',
+    clientId: '',
     description: '',
     priority: 'medium',
     dueDate: '',
     billingRatePerHour: '250',
   })
+
+  useEffect(() => {
+    async function loadClients() {
+      setLoadingClients(true)
+      try {
+        const response = await fetch('/api/clients')
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || 'Unable to load clients')
+        }
+        setClients(data.clients || [])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unable to load clients')
+      } finally {
+        setLoadingClients(false)
+      }
+    }
+
+    void loadClients()
+  }, [])
 
   const set = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }))
@@ -73,22 +100,22 @@ export default function NewMatterPage() {
       <div className="mb-6">
         <Link
           href="/dashboard/legal"
-          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors mb-4"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-800"
         >
           <ArrowLeft size={14} /> Back to legal matters
         </Link>
         <PageHeader
           title="Open a legal matter"
-          description="Create a new matter and assign the first deadline."
+          description="Create a new matter and link it directly to an existing client profile."
         />
       </div>
 
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-xl border border-slate-200 p-6 space-y-5"
+        className="space-y-5 rounded-xl border border-slate-200 bg-white p-6"
       >
         {error && (
-          <div className="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
@@ -110,15 +137,29 @@ export default function NewMatterPage() {
 
         <div>
           <label className={label}>
-            Client name <span className="text-red-500">*</span>
+            Client <span className="text-red-500">*</span>
           </label>
-          <input
+          <select
             className={field}
-            placeholder="e.g. Acme Holdings Limited"
-            value={form.clientName}
-            onChange={(event) => set('clientName', event.target.value)}
+            value={form.clientId}
+            onChange={(event) => set('clientId', event.target.value)}
             required
-          />
+            disabled={loadingClients}
+          >
+            <option value="">
+              {loadingClients ? 'Loading clients...' : 'Select a client'}
+            </option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+          {!loadingClients && clients.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">
+              Add a client first from the clients workspace.
+            </p>
+          ) : null}
         </div>
 
         <div>
@@ -134,7 +175,7 @@ export default function NewMatterPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label className={label}>Priority</label>
             <select
@@ -173,17 +214,17 @@ export default function NewMatterPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+        <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-2">
           <Link
             href="/dashboard/legal"
-            className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+            className="px-4 py-2 text-sm text-slate-600 transition-colors hover:text-slate-900"
           >
             Cancel
           </Link>
           <button
             type="submit"
-            disabled={loading || !form.clientName || !form.description}
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
+            disabled={loading || !form.clientId || !form.description}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Scale size={15} />
             {loading ? 'Creating...' : 'Create matter'}

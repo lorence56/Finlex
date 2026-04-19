@@ -26,7 +26,10 @@
 body {
   font-family: 'Geist', system-ui, sans-serif;
   color: var(--color-text-1);
-  background: var(--color-surface-2);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 26%),
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.08), transparent 24%),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 .scrollbar-thin::-webkit-scrollbar {
   width: 4px;
@@ -34,4 +37,8 @@ body {
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 2px;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.2);
 }

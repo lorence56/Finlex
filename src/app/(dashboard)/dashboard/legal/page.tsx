@@ -6,7 +6,7 @@ import { ChevronRight, Plus, Scale } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { matters } from '@/db/schema'
+import { clients, matters } from '@/db/schema'
 import { db } from '@/lib/db'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
 import { humanizeSnakeCase } from '@/lib/legal'
@@ -44,8 +44,12 @@ export default async function LegalPage() {
   if (!dbUser) redirect('/sign-in')
 
   const rows = await db
-    .select()
+    .select({
+      matter: matters,
+      clientName: clients.name,
+    })
     .from(matters)
+    .leftJoin(clients, eq(clients.id, matters.clientId))
     .where(eq(matters.tenantId, dbUser.tenantId))
     .orderBy(desc(matters.createdAt))
 
@@ -106,7 +110,7 @@ export default async function LegalPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {rows.map((matter) => (
+              {rows.map(({ matter, clientName }) => (
                 <tr
                   key={matter.id}
                   className="hover:bg-slate-50 transition-colors"
@@ -127,7 +131,7 @@ export default async function LegalPage() {
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-slate-600">
-                    {matter.clientId}
+                    {clientName || matter.clientId}
                   </td>
                   <td className="px-5 py-3.5">
                     <Badge
