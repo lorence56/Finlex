@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { differenceInCalendarDays, format } from 'date-fns'
-import { Plus, Repeat } from 'lucide-react'
+import { Download, Plus, Repeat } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Badge } from '@/components/ui/Badge'
 
@@ -481,10 +481,21 @@ export default function InvoicesPage() {
                           {invoice.clientName}
                         </p>
                       </div>
-                      <Badge
-                        label={invoice.status}
-                        variant={statusVariant[invoice.status]}
-                      />
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`/api/pdf/invoice/${invoice.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+                          title="Download PDF"
+                        >
+                          <Download size={14} />
+                        </a>
+                        <Badge
+                          label={invoice.status}
+                          variant={statusVariant[invoice.status]}
+                        />
+                      </div>
                     </div>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
                       <span>{format(due, 'dd MMM yyyy')}</span>

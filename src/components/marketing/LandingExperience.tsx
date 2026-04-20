@@ -276,13 +276,13 @@ export function LandingExperience() {
 
             <div className="flex items-center gap-2">
               <Link
-                href="/auth/sign-in"
+                href="/sign-in"
                 className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
               >
                 Sign in
               </Link>
               <Link
-                href="/auth/sign-up"
+                href="/sign-up"
                 className="primaryButton inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-950/20 transition hover:bg-slate-800"
               >
                 Get started

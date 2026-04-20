@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import {
   ArrowRight,
   Calculator,
+  Download,
   Loader2,
   Play,
   UserPlus,
@@ -485,6 +486,17 @@ export default function PayrollPage() {
                           </td>
                           <td className="px-3 py-3 text-right font-semibold tabular-nums text-emerald-800">
                             {formatKesShillings(line.netPay)}
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            <a
+                              href={`/api/pdf/payslip/${line.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+                              title="Download Payslip"
+                            >
+                              <Download size={14} />
+                            </a>
                           </td>
                         </tr>
                       ))}

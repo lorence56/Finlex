@@ -3,6 +3,7 @@ import { desc, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { invoices, invoiceLines, tenantSettings } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
+import { recordAuditLog } from '@/lib/audit'
 
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue'
 
@@ -11,10 +12,11 @@ type InvoiceLinePayload = {
   quantity?: unknown
   unitPrice?: unknown
   taxRate?: unknown
+  lineTotal?: unknown
 }
 
-function formatInvoiceNo(prefix: string, index: number) {
-  return `${prefix}-${String(index).padStart(4, '0')}`
+function formatInvoiceNo(prefix: string, number: number) {
+  return `${prefix}-${String(number).padStart(4, '0')}`
 }
 
 export async function GET() {
@@ -23,13 +25,13 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
-  const invoiceList = await db
+  const rows = await db
     .select()
     .from(invoices)
     .where(eq(invoices.tenantId, dbUser.tenantId))
     .orderBy(desc(invoices.createdAt))
 
-  return NextResponse.json({ invoices: invoiceList })
+  return NextResponse.json({ invoices: rows })
 }
 
 export async function POST(request: Request) {
@@ -40,91 +42,56 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const clientName = String(body.clientName || '').trim()
-    const clientEmail = String(body.clientEmail || '').trim()
-    const dueDate = new Date(body.dueDate)
-    const status = String(body.status || 'draft') as InvoiceStatus
-    const notes = String(body.notes || '')
-    const lines: InvoiceLinePayload[] = Array.isArray(body.lines) ? body.lines : []
+    const {
+      clientName,
+      clientEmail,
+      status,
+      dueDate: rawDueDate,
+      notes,
+      lines,
+    } = body
 
-    if (!clientName) {
+    if (!clientName || !clientEmail || !status || !rawDueDate || !lines) {
       return NextResponse.json(
-        { error: 'Client name is required' },
+        { error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    if (!clientEmail || !clientEmail.includes('@')) {
-      return NextResponse.json(
-        { error: 'Valid client email is required' },
-        { status: 400 }
-      )
-    }
-
+    const dueDate = new Date(rawDueDate)
     if (Number.isNaN(dueDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid due date' }, { status: 400 })
+    }
+
+    const invoiceRows = lines as InvoiceLinePayload[]
+    if (!invoiceRows.length) {
       return NextResponse.json(
-        { error: 'Due date is invalid' },
+        { error: 'Invoice must have at least one line' },
         { status: 400 }
       )
     }
 
-    if (!['draft', 'sent', 'paid', 'overdue'].includes(status)) {
-      return NextResponse.json(
-        { error: 'Invalid invoice status' },
-        { status: 400 }
-      )
-    }
-
-    if (lines.length === 0) {
-      return NextResponse.json(
-        { error: 'Invoice must have at least one line item' },
-        { status: 400 }
-      )
-    }
-
-    let subtotal = 0
-    let taxAmount = 0
-
-    const invoiceRows = lines.map((line: InvoiceLinePayload) => {
-      const description = String(line.description || '').trim()
-      const quantity = Number(line.quantity) || 0
-      const unitPrice = Math.round((Number(line.unitPrice) || 0) * 100)
-      const taxRate = Number(line.taxRate) || 0
-
-      if (!description) {
-        throw new Error('Each invoice line requires a description')
-      }
-
-      if (quantity <= 0 || unitPrice <= 0) {
-        throw new Error(
-          'Each invoice line requires a positive quantity and unit price'
-        )
-      }
-
-      const lineSubtotal = quantity * unitPrice
-      const lineTax = Math.round(lineSubtotal * (taxRate / 100))
-      subtotal += lineSubtotal
-      taxAmount += lineTax
-
-      return {
-        description,
-        quantity,
-        unitPrice,
-        taxRate,
-        lineTotal: lineSubtotal + lineTax,
-      }
-    })
-
+    const subtotal = invoiceRows.reduce(
+      (sum, line) => sum + Number(line.lineTotal || 0),
+      0
+    )
+    const taxAmount = invoiceRows.reduce(
+      (sum, line) =>
+        sum +
+        Math.round(
+          Number(line.lineTotal || 0) * (Number(line.taxRate || 0) / 100)
+        ),
+      0
+    )
     const total = subtotal + taxAmount
 
-    const tenantSettingsRow = await db
-      .select({ invoicePrefix: tenantSettings.invoicePrefix })
+    const settingsRows = await db
+      .select()
       .from(tenantSettings)
       .where(eq(tenantSettings.tenantId, dbUser.tenantId))
       .limit(1)
 
-    const prefix = tenantSettingsRow[0]?.invoicePrefix ?? 'INV'
-
+    const prefix = settingsRows[0]?.invoicePrefix ?? 'INV'
     const existingInvoices = await db
       .select({ invoiceNo: invoices.invoiceNo })
       .from(invoices)
@@ -158,13 +125,21 @@ export async function POST(request: Request) {
     await db.insert(invoiceLines).values(
       invoiceRows.map((line: (typeof invoiceRows)[number]) => ({
         invoiceId: invoice.id,
-        description: line.description,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice,
-        taxRate: line.taxRate,
-        lineTotal: line.lineTotal,
+        description: String(line.description),
+        quantity: Number(line.quantity),
+        unitPrice: Number(line.unitPrice),
+        taxRate: Number(line.taxRate),
+        lineTotal: Number(line.lineTotal),
       }))
     )
+
+    await recordAuditLog({
+      tenantId: dbUser.tenantId,
+      actorId: dbUser.id,
+      action: 'invoice_created',
+      entityType: 'invoice',
+      entityId: invoice.id,
+    })
 
     return NextResponse.json({ invoice }, { status: 201 })
   } catch (error) {

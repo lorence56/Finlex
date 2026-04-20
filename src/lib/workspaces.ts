@@ -1,9 +1,8 @@
+import { Resource } from './permissions-client'
+
 export const WORKSPACE_COOKIE = 'finlex-workspace'
 
-export type WorkspaceId =
-  | 'finlex-holdings'
-  | 'client-funds'
-  | 'hpv-structures'
+export type WorkspaceId = 'finlex-holdings' | 'client-funds' | 'hpv-structures'
 
 export type WorkspaceIconName =
   | 'layout-dashboard'
@@ -30,6 +29,7 @@ export type WorkspaceNavItem = {
   href: string
   icon: WorkspaceIconName
   description: string
+  resource?: Resource
 }
 
 export type WorkspaceAction = {
@@ -40,7 +40,13 @@ export type WorkspaceAction = {
 }
 
 export type WorkspaceMetricDefinition = {
-  key: 'companies' | 'clients' | 'matters' | 'documents' | 'compliance' | 'netPosition'
+  key:
+    | 'companies'
+    | 'clients'
+    | 'matters'
+    | 'documents'
+    | 'compliance'
+    | 'netPosition'
   label: string
   helper: string
   icon: WorkspaceIconName
@@ -108,36 +114,49 @@ export const WORKSPACES: WorkspaceConfig[] = [
         href: '/dashboard/companies',
         icon: 'building-2',
         description: 'Entity setup and registry control.',
+        resource: 'companies',
       },
       {
         label: 'Legal',
         href: '/dashboard/legal',
         icon: 'scale',
         description: 'Matters, contracts, and deadlines.',
+        resource: 'legal',
       },
       {
         label: 'Accounting',
         href: '/dashboard/accounting',
         icon: 'calculator',
         description: 'General ledger and finance operations.',
+        resource: 'accounting',
       },
       {
         label: 'Documents',
         href: '/dashboard/documents',
         icon: 'file-text',
         description: 'Central document vault and sharing.',
+        resource: 'documents',
       },
       {
         label: 'Clients',
         href: '/dashboard/clients',
         icon: 'users',
         description: 'Client relationships and records.',
+        resource: 'clients',
+      },
+      {
+        label: 'Analytics',
+        href: '/dashboard/analytics',
+        icon: 'line-chart',
+        description: 'Firm performance and growth.',
+        resource: 'legal', // Using legal as a proxy for now, or could be accounting
       },
       {
         label: 'Settings',
         href: '/dashboard/settings',
         icon: 'settings',
         description: 'Profile, billing, and preferences.',
+        resource: 'settings',
       },
     ],
     primaryActions: [
@@ -149,7 +168,8 @@ export const WORKSPACES: WorkspaceConfig[] = [
       },
       {
         title: 'Open a legal matter',
-        description: 'Create a cross-functional matter with deadlines and notes.',
+        description:
+          'Create a cross-functional matter with deadlines and notes.',
         href: '/dashboard/legal/new',
         icon: 'scale',
       },
@@ -163,7 +183,8 @@ export const WORKSPACES: WorkspaceConfig[] = [
     toolset: [
       {
         title: 'Corporate registry desk',
-        description: 'Track entity records, directors, and operating footprint.',
+        description:
+          'Track entity records, directors, and operating footprint.',
         href: '/dashboard/companies',
         icon: 'briefcase-business',
       },
@@ -223,10 +244,12 @@ export const WORKSPACES: WorkspaceConfig[] = [
     code: 'CF',
     shellLabel: 'Trust operations desk',
     entityType: 'Funds workspace',
-    heroTitle: 'Protect client money with tighter oversight and faster movement',
+    heroTitle:
+      'Protect client money with tighter oversight and faster movement',
     heroDescription:
       'Operate trust accounts, client-ledger workflows, reconciliations, and disbursement approvals from a dedicated workspace.',
-    switcherDescription: 'Trust accounts, reconciliations, and client money controls.',
+    switcherDescription:
+      'Trust accounts, reconciliations, and client money controls.',
     theme: {
       orb: 'from-emerald-600 via-teal-500 to-cyan-400',
       glow: 'from-emerald-500/25 via-teal-400/20 to-transparent',
@@ -248,36 +271,42 @@ export const WORKSPACES: WorkspaceConfig[] = [
         href: '/dashboard/accounting',
         icon: 'wallet',
         description: 'Client money ledgers and journals.',
+        resource: 'accounting',
       },
       {
         label: 'Disbursements',
         href: '/dashboard/accounting/invoices',
         icon: 'arrow-left-right',
         description: 'Review outgoing and incoming fund requests.',
+        resource: 'accounting',
       },
       {
         label: 'Clients',
         href: '/dashboard/clients',
         icon: 'users',
         description: 'Client profiles and fund owners.',
+        resource: 'clients',
       },
       {
         label: 'Matters',
         href: '/dashboard/legal',
         icon: 'scale',
         description: 'Mandates linked to trust activity.',
+        resource: 'legal',
       },
       {
         label: 'Documents',
         href: '/dashboard/documents',
         icon: 'file-text',
         description: 'Mandates, confirmations, and receipts.',
+        resource: 'documents',
       },
       {
         label: 'Settings',
         href: '/dashboard/settings',
         icon: 'settings',
         description: 'Workspace policies and preferences.',
+        resource: 'settings',
       },
     ],
     primaryActions: [
@@ -303,7 +332,8 @@ export const WORKSPACES: WorkspaceConfig[] = [
     toolset: [
       {
         title: 'Trust reconciliation board',
-        description: 'Use journals and reports to balance client ledgers quickly.',
+        description:
+          'Use journals and reports to balance client ledgers quickly.',
         href: '/dashboard/accounting/reports',
         icon: 'line-chart',
       },
@@ -363,10 +393,12 @@ export const WORKSPACES: WorkspaceConfig[] = [
     code: 'HPV',
     shellLabel: 'Structure launchpad',
     entityType: 'Special structures workspace',
-    heroTitle: 'Coordinate special structures with legal precision and clear oversight',
+    heroTitle:
+      'Coordinate special structures with legal precision and clear oversight',
     heroDescription:
       'Manage formation, filings, contracts, and operating records for SPVs, project vehicles, and bespoke holding structures.',
-    switcherDescription: 'SPVs, project vehicles, and bespoke structure administration.',
+    switcherDescription:
+      'SPVs, project vehicles, and bespoke structure administration.',
     theme: {
       orb: 'from-violet-600 via-fuchsia-500 to-rose-400',
       glow: 'from-fuchsia-500/25 via-violet-400/20 to-transparent',
@@ -381,43 +413,49 @@ export const WORKSPACES: WorkspaceConfig[] = [
         label: 'Overview',
         href: dashboardHref,
         icon: 'layout-dashboard',
-        description: 'Formation pipeline and compliance pulse.',
+        description: 'Formation pipeline and live vehicles.',
       },
       {
         label: 'Structures',
         href: '/dashboard/companies',
         icon: 'network',
         description: 'Entities, vehicles, and ownership mapping.',
+        resource: 'companies',
       },
       {
         label: 'Legal',
         href: '/dashboard/legal',
         icon: 'scale',
         description: 'Formation, transaction, and governance matters.',
+        resource: 'legal',
       },
       {
         label: 'Accounting',
         href: '/dashboard/accounting',
         icon: 'calculator',
         description: 'Funding flows and operational finance.',
+        resource: 'accounting',
       },
       {
         label: 'Documents',
         href: '/dashboard/documents',
         icon: 'file-text',
         description: 'Formation packs, resolutions, and registers.',
+        resource: 'documents',
       },
       {
         label: 'Stakeholders',
         href: '/dashboard/clients',
         icon: 'users',
         description: 'Sponsors, investors, and counterparties.',
+        resource: 'clients',
       },
       {
         label: 'Settings',
         href: '/dashboard/settings',
         icon: 'settings',
         description: 'Workspace controls and naming.',
+        resource: 'settings',
       },
     ],
     primaryActions: [
@@ -513,8 +551,5 @@ export function resolveWorkspaceId(value?: string | null): WorkspaceId {
 }
 
 export function getWorkspaceById(id: WorkspaceId): WorkspaceConfig {
-  return (
-    WORKSPACES.find((workspace) => workspace.id === id) ??
-    WORKSPACES[0]
-  )
+  return WORKSPACES.find((workspace) => workspace.id === id) ?? WORKSPACES[0]
 }

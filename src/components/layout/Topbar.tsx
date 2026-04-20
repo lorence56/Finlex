@@ -1,8 +1,10 @@
 import { UserButton } from '@clerk/nextjs'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { Bell } from 'lucide-react'
+import { Bell, Search } from 'lucide-react'
 import clsx from 'clsx'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher'
+import { SearchTrigger } from './SearchTrigger'
+import { CommandPalette } from '@/components/ui/CommandPalette'
 import {
   getWorkspaceById,
   type WorkspaceId,
@@ -47,9 +49,11 @@ export async function Topbar({
       <div className="flex flex-1 items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <WorkspaceSwitcher activeWorkspaceId={activeWorkspaceId} />
+          <SearchTrigger />
         </div>
 
         <div className="flex flex-1 justify-end gap-3">
+          <CommandPalette />
           <button className="relative flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/80 transition-colors hover:bg-slate-100">
             <Bell size={16} className="text-slate-500" />
             <span

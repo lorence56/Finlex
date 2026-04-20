@@ -10,6 +10,8 @@ import {
   type WorkspaceId,
 } from '@/lib/workspaces'
 
+import { CanAccess } from '@/components/ui/CanAccess'
+
 export function Sidebar({
   activeWorkspaceId,
 }: {
@@ -41,12 +43,12 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
-        {workspace.nav.map(({ label, href, icon, description }) => {
+        {workspace.nav.map(({ label, href, icon, description, resource }) => {
           const Icon = workspaceIcons[icon]
           const active =
             href === '/dashboard' ? path === '/dashboard' : path.startsWith(href)
 
-          return (
+          const navItem = (
             <Link
               key={href}
               href={href}
@@ -78,6 +80,16 @@ export function Sidebar({
               ) : null}
             </Link>
           )
+
+          if (resource) {
+            return (
+              <CanAccess key={href} resource={resource} action="view">
+                {navItem}
+              </CanAccess>
+            )
+          }
+
+          return navItem
         })}
       </nav>
 

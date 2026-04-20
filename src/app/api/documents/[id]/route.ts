@@ -5,6 +5,7 @@ import { del } from '@vercel/blob'
 import { documents } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
 import { normalizeString } from '@/lib/legal'
+import { recordAuditLog } from '@/lib/audit'
 
 const DOCUMENT_STATUSES = [
   'draft',
@@ -83,6 +84,14 @@ export async function PATCH(
     .where(and(eq(documents.id, id), eq(documents.tenantId, dbUser.tenantId)))
     .returning()
 
+  await recordAuditLog({
+    tenantId: dbUser.tenantId,
+    actorId: dbUser.id,
+    action: 'document_updated',
+    entityType: 'document',
+    entityId: document.id,
+  })
+
   return NextResponse.json({ document })
 }
 
@@ -118,6 +127,14 @@ export async function DELETE(
   await db
     .delete(documents)
     .where(and(eq(documents.id, id), eq(documents.tenantId, dbUser.tenantId)))
+
+  await recordAuditLog({
+    tenantId: dbUser.tenantId,
+    actorId: dbUser.id,
+    action: 'document_deleted',
+    entityType: 'document',
+    entityId: id,
+  })
 
   return NextResponse.json({ success: true })
 }

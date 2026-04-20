@@ -11,19 +11,19 @@ import {
   normalizeString,
   parseOptionalDate,
 } from '@/lib/legal'
+import { recordAuditLog } from '@/lib/audit'
 
 async function getScopedMatter(id: string, tenantId: string) {
-  const rows = await db
+  const [row] = await db
     .select()
     .from(matters)
     .where(and(eq(matters.id, id), eq(matters.tenantId, tenantId)))
     .limit(1)
-
-  return rows[0] ?? null
+  return row
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   const dbUser = await getCurrentDbUser()
@@ -38,29 +38,37 @@ export async function GET(
     return NextResponse.json({ error: 'Matter not found' }, { status: 404 })
   }
 
-  const [tasks, notes, entries] = await Promise.all([
+  const [client, notes, tasks, time] = await Promise.all([
     db
       .select()
-      .from(matterTasks)
-      .where(eq(matterTasks.matterId, matter.id))
-      .orderBy(asc(matterTasks.createdAt)),
+      .from(clients)
+      .where(and(eq(clients.id, matter.clientId), eq(clients.tenantId, dbUser.tenantId)))
+      .limit(1),
     db
       .select()
       .from(matterNotes)
-      .where(eq(matterNotes.matterId, matter.id))
+      .where(eq(matterNotes.matterId, id))
       .orderBy(asc(matterNotes.createdAt)),
     db
       .select()
+      .from(matterTasks)
+      .where(eq(matterTasks.matterId, id))
+      .orderBy(asc(matterTasks.dueDate)),
+    db
+      .select()
       .from(timeEntries)
-      .where(eq(timeEntries.matterId, matter.id))
+      .where(eq(timeEntries.matterId, id))
       .orderBy(asc(timeEntries.createdAt)),
   ])
 
   return NextResponse.json({
-    matter,
-    tasks,
-    notes,
-    timeEntries: entries,
+    matter: {
+      ...matter,
+      client: client[0],
+      notes,
+      tasks,
+      time,
+    },
   })
 }
 
@@ -122,7 +130,7 @@ export async function PATCH(
     const description = normalizeString(body.description)
     if (!description) {
       return NextResponse.json(
-        { error: 'Matter description is required' },
+        { error: 'Description is required' },
         { status: 400 }
       )
     }
@@ -132,7 +140,10 @@ export async function PATCH(
   if ('status' in body) {
     const status = normalizeString(body.status).toLowerCase()
     if (!isInArray(status, MATTER_STATUSES)) {
-      return NextResponse.json({ error: 'Status is invalid' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Matter status is invalid' },
+        { status: 400 }
+      )
     }
     updates.status = status
   }
@@ -141,11 +152,22 @@ export async function PATCH(
     const priority = normalizeString(body.priority).toLowerCase()
     if (!isInArray(priority, MATTER_PRIORITIES)) {
       return NextResponse.json(
-        { error: 'Priority is invalid' },
+        { error: 'Matter priority is invalid' },
         { status: 400 }
       )
     }
     updates.priority = priority
+  }
+
+  if ('billingRatePerHour' in body) {
+    const rate = Number(body.billingRatePerHour)
+    if (Number.isNaN(rate) || rate < 0) {
+      return NextResponse.json(
+        { error: 'Billing rate is invalid' },
+        { status: 400 }
+      )
+    }
+    updates.billingRatePerHour = rate
   }
 
   if ('dueDate' in body) {
@@ -159,28 +181,25 @@ export async function PATCH(
     updates.dueDate = dueDate
   }
 
-  if ('billingRatePerHour' in body) {
-    const billingRatePerHour = Number(body.billingRatePerHour)
-    if (!Number.isFinite(billingRatePerHour) || billingRatePerHour <= 0) {
-      return NextResponse.json(
-        { error: 'Billing rate per hour is invalid' },
-        { status: 400 }
-      )
-    }
-    updates.billingRatePerHour = Math.round(billingRatePerHour * 100)
-  }
-
   const [matter] = await db
     .update(matters)
     .set(updates)
     .where(and(eq(matters.id, id), eq(matters.tenantId, dbUser.tenantId)))
     .returning()
 
+  await recordAuditLog({
+    tenantId: dbUser.tenantId,
+    actorId: dbUser.id,
+    action: 'matter_updated',
+    entityType: 'matter',
+    entityId: matter.id,
+  })
+
   return NextResponse.json({ matter })
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   const dbUser = await getCurrentDbUser()
@@ -199,5 +218,13 @@ export async function DELETE(
     .delete(matters)
     .where(and(eq(matters.id, id), eq(matters.tenantId, dbUser.tenantId)))
 
-  return NextResponse.json({ success: true })
+  await recordAuditLog({
+    tenantId: dbUser.tenantId,
+    actorId: dbUser.id,
+    action: 'matter_deleted',
+    entityType: 'matter',
+    entityId: id,
+  })
+
+  return NextResponse.json({ message: 'Matter deleted successfully' })
 }

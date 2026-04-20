@@ -21,6 +21,9 @@ export const tenants = pgTable('tenants', {
   slug: text('slug').notNull().unique(),
   plan: text('plan').notNull().default('free'),
   status: text('status').notNull().default('active'),
+  address: text('address'),
+  kraPin: text('kra_pin'),
+  logoUrl: text('logo_url'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
@@ -486,6 +489,7 @@ export const tenantSettings = pgTable(
     currency: text('currency').notNull().default('USD'),
     billingTermsDays: integer('billing_terms_days').notNull().default(30),
     invoicePrefix: text('invoice_prefix').notNull().default('INV'),
+    letterheadText: text('letterhead_text'),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   (table) => [index('tenant_settings_currency_idx').on(table.currency)]

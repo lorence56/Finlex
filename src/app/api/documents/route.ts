@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { clients, companies, documents, matters } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
 import { normalizeString } from '@/lib/legal'
+import { recordAuditLog } from '@/lib/audit'
 
 const DOCUMENT_CATEGORIES = [
   'general',
@@ -74,36 +75,27 @@ export async function POST(request: Request) {
 
   const body = await request.json()
   const title = normalizeString(body.title)
-  const category = normalizeString(body.category || 'general').toLowerCase()
-  const status = normalizeString(body.status || 'draft').toLowerCase()
+  const category = normalizeString(body.category).toLowerCase()
+  const status = normalizeString(body.status).toLowerCase()
   const fileUrl = normalizeString(body.fileUrl)
-  const matterId = normalizeString(body.matterId)
-  const clientId = normalizeString(body.clientId)
-  const companyId = normalizeString(body.companyId)
   const blobUrl = normalizeString(body.blobUrl)
   const blobKey = normalizeString(body.blobKey)
   const mimeType = normalizeString(body.mimeType)
-  const sizeBytes = Number(body.sizeBytes) || null
+  const sizeBytes = Number(body.sizeBytes) || 0
+  const matterId = normalizeString(body.matterId)
+  const clientId = normalizeString(body.clientId)
+  const companyId = normalizeString(body.companyId)
 
   if (!title) {
-    return NextResponse.json(
-      { error: 'Document title is required' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Title is required' }, { status: 400 })
   }
 
   if (!isValidCategory(category)) {
-    return NextResponse.json(
-      { error: 'Document category is invalid' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Category is invalid' }, { status: 400 })
   }
 
   if (!isValidStatus(status)) {
-    return NextResponse.json(
-      { error: 'Document status is invalid' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Status is invalid' }, { status: 400 })
   }
 
   if (matterId) {
@@ -169,6 +161,14 @@ export async function POST(request: Request) {
       uploadedBy: dbUser.id,
     })
     .returning()
+
+  await recordAuditLog({
+    tenantId: dbUser.tenantId,
+    actorId: dbUser.id,
+    action: 'document_uploaded',
+    entityType: 'document',
+    entityId: document.id,
+  })
 
   return NextResponse.json({ document }, { status: 201 })
 }

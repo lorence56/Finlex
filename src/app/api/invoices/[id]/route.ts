@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { invoiceLines, invoices } from '@/db/schema'
 import { getCurrentDbUser } from '@/lib/get-current-db-user'
+import { recordAuditLog } from '@/lib/audit'
 
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue'
 
@@ -89,6 +90,14 @@ export async function PATCH(
   if (!invoice) {
     return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
   }
+
+  await recordAuditLog({
+    tenantId: dbUser.tenantId,
+    actorId: dbUser.id,
+    action: `invoice_${invoice.status}`,
+    entityType: 'invoice',
+    entityId: invoice.id,
+  })
 
   return NextResponse.json({ invoice })
 }

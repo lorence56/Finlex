@@ -10,6 +10,7 @@ import {
   normalizeString,
   parseOptionalDate,
 } from '@/lib/legal'
+import { recordAuditLog } from '@/lib/audit'
 
 export async function GET() {
   const dbUser = await getCurrentDbUser()
@@ -18,8 +19,22 @@ export async function GET() {
   }
 
   const rows = await db
-    .select()
+    .select({
+      id: matters.id,
+      clientId: matters.clientId,
+      assignedTo: matters.assignedTo,
+      type: matters.type,
+      status: matters.status,
+      priority: matters.priority,
+      description: matters.description,
+      billingRatePerHour: matters.billingRatePerHour,
+      dueDate: matters.dueDate,
+      createdAt: matters.createdAt,
+      updatedAt: matters.updatedAt,
+      clientName: clients.name,
+    })
     .from(matters)
+    .innerJoin(clients, eq(matters.clientId, clients.id))
     .where(eq(matters.tenantId, dbUser.tenantId))
     .orderBy(desc(matters.createdAt))
 
@@ -35,44 +50,24 @@ export async function POST(request: Request) {
   const body = await request.json()
   const type = normalizeString(body.type)
   const clientId = normalizeString(body.clientId || body.clientName)
+  const priority = normalizeString(body.priority)
   const description = normalizeString(body.description)
-  const priority = normalizeString(body.priority).toLowerCase()
+  const billingRatePerHour = Number(body.billingRatePerHour) || 25000
   const dueDate = parseOptionalDate(body.dueDate)
-  const billingRatePerHour =
-    Number.isFinite(Number(body.billingRatePerHour)) &&
-    Number(body.billingRatePerHour) > 0
-      ? Math.round(Number(body.billingRatePerHour) * 100)
-      : 25000
 
-  if (!isInArray(type, MATTER_TYPES)) {
-    return NextResponse.json(
-      { error: 'Matter type is invalid' },
-      { status: 400 }
-    )
+  if (!type || !isInArray(type, MATTER_TYPES)) {
+    return NextResponse.json({ error: 'Matter type is invalid' }, { status: 400 })
   }
 
   if (!clientId) {
-    return NextResponse.json(
-      { error: 'Client is required' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Client is required' }, { status: 400 })
   }
 
   if (!description) {
     return NextResponse.json(
-      { error: 'Matter description is required' },
+      { error: 'Description is required' },
       { status: 400 }
     )
-  }
-
-  if (
-    !isInArray(priority, MATTER_PRIORITIES)
-  ) {
-    return NextResponse.json({ error: 'Priority is invalid' }, { status: 400 })
-  }
-
-  if (body.dueDate && !dueDate) {
-    return NextResponse.json({ error: 'Due date is invalid' }, { status: 400 })
   }
 
   const [client] = await db
@@ -93,12 +88,20 @@ export async function POST(request: Request) {
       assignedTo: dbUser.id,
       type,
       status: 'open',
-      priority,
+      priority: isInArray(priority, MATTER_PRIORITIES) ? priority : 'medium',
       description,
       billingRatePerHour,
       dueDate,
     })
     .returning()
+
+  await recordAuditLog({
+    tenantId: dbUser.tenantId,
+    actorId: dbUser.id,
+    action: 'matter_created',
+    entityType: 'matter',
+    entityId: matter.id,
+  })
 
   return NextResponse.json({ matter }, { status: 201 })
 }
