@@ -86,8 +86,9 @@ export async function POST(request: Request) {
     )
   }
 
-  const result = await db.transaction(async (tx) => {
-    const [run] = await tx
+  try {
+    // Insert payroll run
+    const [run] = await db
       .insert(payrollRuns)
       .values({
         tenantId: dbUser.tenantId,
@@ -96,10 +97,11 @@ export async function POST(request: Request) {
       })
       .returning()
 
+    // Insert payroll lines
     const lineRows = []
     for (const emp of staff) {
       const calc = computeNetPay(emp)
-      const [line] = await tx
+      const [line] = await db
         .insert(payrollLines)
         .values({
           payrollRunId: run.id,
@@ -114,8 +116,15 @@ export async function POST(request: Request) {
       lineRows.push(line)
     }
 
-    return { run, lines: lineRows }
-  })
-
-  return NextResponse.json(result, { status: 201 })
+    const result = { run, lines: lineRows }
+    return NextResponse.json(result, { status: 201 })
+  } catch (error) {
+    console.error('Payroll error:', error)
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to run payroll',
+      },
+      { status: 500 }
+    )
+  }
 }

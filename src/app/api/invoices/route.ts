@@ -71,16 +71,26 @@ export async function POST(request: Request) {
       )
     }
 
-    const subtotal = invoiceRows.reduce(
-      (sum, line) => sum + Number(line.lineTotal || 0),
+    // Calculate line totals server-side to avoid NaN issues
+    const calculatedLines = invoiceRows.map((line) => {
+      const quantity = Number(line.quantity || 0)
+      const unitPrice = Number(line.unitPrice || 0)
+      const taxRate = Number(line.taxRate || 0)
+
+      if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) {
+        throw new Error('Invalid quantity or unit price')
+      }
+
+      const lineTotal = quantity * unitPrice
+      return { ...line, quantity, unitPrice, taxRate, lineTotal }
+    })
+
+    const subtotal = calculatedLines.reduce(
+      (sum, line) => sum + line.lineTotal,
       0
     )
-    const taxAmount = invoiceRows.reduce(
-      (sum, line) =>
-        sum +
-        Math.round(
-          Number(line.lineTotal || 0) * (Number(line.taxRate || 0) / 100)
-        ),
+    const taxAmount = calculatedLines.reduce(
+      (sum, line) => sum + Math.round(line.lineTotal * (line.taxRate / 100)),
       0
     )
     const total = subtotal + taxAmount
@@ -123,13 +133,13 @@ export async function POST(request: Request) {
       .returning()
 
     await db.insert(invoiceLines).values(
-      invoiceRows.map((line: (typeof invoiceRows)[number]) => ({
+      calculatedLines.map((line) => ({
         invoiceId: invoice.id,
-        description: String(line.description),
-        quantity: Number(line.quantity),
-        unitPrice: Number(line.unitPrice),
-        taxRate: Number(line.taxRate),
-        lineTotal: Number(line.lineTotal),
+        description: String(line.description || ''),
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        taxRate: line.taxRate,
+        lineTotal: line.lineTotal,
       }))
     )
 

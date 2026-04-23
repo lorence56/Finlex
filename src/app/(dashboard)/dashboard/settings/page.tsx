@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import {
   Building2,
   FileText,
@@ -12,6 +13,10 @@ import {
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SurfaceCard } from '@/components/ui/SurfaceCard'
 
+interface DocumentStats {
+  total: number
+}
+
 const SETTINGS_CARDS = [
   {
     title: 'Profile',
@@ -20,6 +25,7 @@ const SETTINGS_CARDS = [
     icon: UserCog,
     color: 'text-blue-600',
     bgColor: 'bg-blue-50',
+    stat: null,
   },
   {
     title: 'Organisation',
@@ -28,6 +34,7 @@ const SETTINGS_CARDS = [
     icon: Building2,
     color: 'text-emerald-600',
     bgColor: 'bg-emerald-50',
+    stat: null,
   },
   {
     title: 'Team Management',
@@ -36,6 +43,16 @@ const SETTINGS_CARDS = [
     icon: Users,
     color: 'text-purple-600',
     bgColor: 'bg-purple-50',
+    stat: null,
+  },
+  {
+    title: 'Documents',
+    description: 'Manage and organize uploaded documents in blob storage.',
+    href: '/dashboard/documents',
+    icon: FileText,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-50',
+    stat: 'documentCount',
   },
   {
     title: 'Audit Logs',
@@ -44,6 +61,7 @@ const SETTINGS_CARDS = [
     icon: History,
     color: 'text-amber-600',
     bgColor: 'bg-amber-50',
+    stat: null,
   },
   {
     title: 'Roles & Permissions',
@@ -52,18 +70,39 @@ const SETTINGS_CARDS = [
     icon: ShieldCheck,
     color: 'text-rose-600',
     bgColor: 'bg-rose-50',
-  },
-  {
-    title: 'Letterhead & PDFs',
-    description: 'Customise the look and feel of your generated documents.',
-    href: '/dashboard/settings/organisation', // Links to organisation for now
-    icon: FileText,
-    color: 'text-slate-600',
-    bgColor: 'bg-slate-50',
+    stat: null,
   },
 ]
 
 export default function SettingsPage() {
+  const [documentCount, setDocumentCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/documents/stats')
+        if (response.ok) {
+          const data = (await response.json()) as DocumentStats
+          setDocumentCount(data.total)
+        }
+      } catch (error) {
+        console.error('Failed to fetch document stats:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [])
+
+  const cardsWithStats = SETTINGS_CARDS.map((card) => {
+    if (card.stat === 'documentCount') {
+      return { ...card, statValue: documentCount }
+    }
+    return { ...card, statValue: null }
+  })
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -72,14 +111,23 @@ export default function SettingsPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {SETTINGS_CARDS.map((card) => (
+        {cardsWithStats.map((card) => (
           <Link key={card.title} href={card.href} className="group">
             <SurfaceCard className="h-full transition-all hover:border-blue-200 hover:shadow-md">
               <div className="flex flex-col gap-4">
-                <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.bgColor} ${card.color}`}
-                >
-                  <card.icon size={20} />
+                <div className="flex items-start justify-between">
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.bgColor} ${card.color}`}
+                  >
+                    <card.icon size={20} />
+                  </div>
+                  {card.statValue !== null && !loading && (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                      <span className="text-sm font-semibold text-slate-900">
+                        {card.statValue}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900 group-hover:text-blue-600">

@@ -29,15 +29,8 @@ export async function GET(
   }
 
   const [lines, tenant, settings] = await Promise.all([
-    db
-      .select()
-      .from(invoiceLines)
-      .where(eq(invoiceLines.invoiceId, id)),
-    db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.id, dbUser.tenantId))
-      .limit(1),
+    db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id)),
+    db.select().from(tenants).where(eq(tenants.id, dbUser.tenantId)).limit(1),
     db
       .select()
       .from(tenantSettings)
@@ -52,17 +45,21 @@ export async function GET(
         lines={lines}
         organisation={tenant[0]}
         settings={settings[0]}
-      /> as React.ReactElement<any>
+      />
     )
 
-    return new Response(stream as any, {
+    return new Response(stream as unknown as ReadableStream, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="invoice-${invoice.invoiceNo}.pdf"`,
       },
     })
-  } catch (error) {
-    console.error('PDF generation error:', error)
-    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 })
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'PDF Generation Failed'
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 }
