@@ -1,0 +1,263 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { POST as clerkWebhookPOST } from '@/app/api/webhooks/clerk/route'
+
+// ─── next/headers must be mocked BEFORE the route is imported ───────────────
+// The route calls `await headers()` from next/headers, NOT from the Request
+// object, so passing headers to `new Request(...)` has no effect on the route.
+// We control what the route sees by controlling this mock's return value.
+const mockHeadersStore = new Map<string, string>()
+
+vi.mock('next/headers', () => ({
+  headers: vi.fn(() => ({
+    get: (key: string) => mockHeadersStore.get(key) ?? null,
+  })),
+}))
+
+// ─── Other external dependencies ────────────────────────────────────────────
+vi.mock('@/lib/provision-user', () => ({ provisionUser: vi.fn() }))
+vi.mock('@/lib/email', () => ({ sendEmail: vi.fn() }))
+vi.mock('@/lib/stripe', () => ({
+  stripe: {
+    customers: { create: vi.fn() },
+    subscriptions: { create: vi.fn() },
+  },
+}))
+vi.mock('@/lib/db', () => ({
+  db: {
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({ returning: vi.fn(() => [{}]) })),
+    })),
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(() => []) })) })),
+    })),
+  },
+}))
+vi.mock('@/db/schema', () => ({
+  notifications: 'notifications',
+  subscriptions: 'subscriptions',
+  eq: vi.fn(),
+}))
+vi.mock('svix', () => ({ Webhook: vi.fn() }))
+
+import { provisionUser } from '@/lib/provision-user'
+import { sendEmail } from '@/lib/email'
+import { stripe } from '@/lib/stripe'
+import { db } from '@/lib/db'
+import { Webhook } from 'svix'
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function makeRequest(body: object, svixHeaders?: Record<string, string>) {
+  // Headers in the Request object are irrelevant to the route —
+  // the route reads from next/headers mock, not from here.
+  // We keep them in sync via mockHeadersStore for clarity.
+  mockHeadersStore.clear()
+  if (svixHeaders) {
+    Object.entries(svixHeaders).forEach(([k, v]) => mockHeadersStore.set(k, v))
+  }
+  return new Request('http://localhost/api/webhooks/clerk', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+const VALID_SVIX_HEADERS = {
+  'svix-id': 'test-id',
+  'svix-timestamp': 'test-timestamp',
+  'svix-signature': 'test-signature',
+}
+
+const validUserCreatedEvent = {
+  type: 'user.created',
+  data: {
+    id: 'clerk_user_123',
+    email_addresses: [{ email_address: 'test@example.com' }],
+    first_name: 'John',
+    last_name: 'Doe',
+  },
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+describe('Clerk Webhook Handler', () => {
+  const mockWebhook = { verify: vi.fn() }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockHeadersStore.clear()
+    ;(Webhook as ReturnType<typeof vi.fn>).mockImplementation(() => mockWebhook)
+    vi.stubEnv('CLERK_WEBHOOK_SECRET', 'test-webhook-secret')
+
+    vi.mocked(stripe.customers.create).mockResolvedValue({
+      id: 'cus_test_123',
+      email: 'test@example.com',
+    } as never)
+
+    vi.mocked(stripe.subscriptions.create).mockResolvedValue({
+      id: 'sub_test_123',
+      customer: 'cus_test_123',
+      status: 'active',
+    } as never)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  // ── Webhook Verification ──────────────────────────────────────────────────
+  describe('Webhook Verification', () => {
+    it('should return 500 when CLERK_WEBHOOK_SECRET is not configured', async () => {
+      vi.stubEnv('CLERK_WEBHOOK_SECRET', '')
+
+      const req = makeRequest(
+        { type: 'user.created', data: {} },
+        VALID_SVIX_HEADERS
+      )
+      const response = await clerkWebhookPOST(req)
+      const data = await response.json()
+
+      expect(response.status).toBe(500)
+      expect(data.error).toBe('CLERK_WEBHOOK_SECRET not configured')
+    })
+
+    it('should return 400 when svix headers are missing', async () => {
+      // No svix headers added to mockHeadersStore
+      const req = makeRequest({ type: 'user.created', data: {} })
+      const response = await clerkWebhookPOST(req)
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toBe('Missing svix headers')
+    })
+
+    it('should return 400 when webhook signature is invalid', async () => {
+      mockWebhook.verify.mockImplementation(() => {
+        throw new Error('Invalid signature')
+      })
+
+      const req = makeRequest(
+        { type: 'user.created', data: {} },
+        VALID_SVIX_HEADERS
+      )
+      const response = await clerkWebhookPOST(req)
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toBe('Invalid webhook signature')
+    })
+  })
+
+  // ── User Creation ─────────────────────────────────────────────────────────
+  describe('User Creation Event', () => {
+    beforeEach(() => {
+      mockWebhook.verify.mockReturnValue(validUserCreatedEvent)
+    })
+
+    it('should successfully process user.created event', async () => {
+      vi.mocked(provisionUser).mockResolvedValue({
+        id: 'user_123',
+        tenantId: 'tenant_123',
+        email: 'test@example.com',
+        fullName: 'John Doe',
+      } as never)
+
+      const req = makeRequest(validUserCreatedEvent, VALID_SVIX_HEADERS)
+      const response = await clerkWebhookPOST(req)
+
+      expect(response.status).toBe(200)
+      expect(provisionUser).toHaveBeenCalledWith({
+        clerkUserId: 'clerk_user_123',
+        email: 'test@example.com',
+        fullName: 'John Doe',
+      })
+      expect(sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'test@example.com',
+          subject: 'Welcome to Finlex',
+        })
+      )
+      expect(db.insert).toHaveBeenCalledWith('notifications')
+      expect(stripe.customers.create).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'test@example.com' })
+      )
+    })
+
+    it('should handle user with only email (no name)', async () => {
+      const eventWithoutName = {
+        ...validUserCreatedEvent,
+        data: {
+          ...validUserCreatedEvent.data,
+          first_name: null,
+          last_name: null,
+        },
+      }
+      mockWebhook.verify.mockReturnValue(eventWithoutName)
+
+      vi.mocked(provisionUser).mockResolvedValue({
+        id: 'user_123',
+        tenantId: 'tenant_123',
+        email: 'test@example.com',
+        fullName: 'test@example.com',
+      } as never)
+
+      const req = makeRequest(eventWithoutName, VALID_SVIX_HEADERS)
+      const response = await clerkWebhookPOST(req)
+
+      expect(response.status).toBe(200)
+      expect(provisionUser).toHaveBeenCalledWith({
+        clerkUserId: 'clerk_user_123',
+        email: 'test@example.com',
+        fullName: 'test@example.com', // falls back to email
+      })
+    })
+
+    it('should not create Stripe subscription if one already exists', async () => {
+      vi.mocked(db.select).mockReturnValue({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn(() => [{ id: 'existing_sub' }]), // existing subscription
+          })),
+        })),
+      } as never)
+
+      vi.mocked(provisionUser).mockResolvedValue({
+        id: 'user_123',
+        tenantId: 'tenant_123',
+        email: 'test@example.com',
+        fullName: 'John Doe',
+      } as never)
+
+      const req = makeRequest(validUserCreatedEvent, VALID_SVIX_HEADERS)
+      const response = await clerkWebhookPOST(req)
+
+      expect(response.status).toBe(200)
+      expect(stripe.subscriptions.create).not.toHaveBeenCalled()
+    })
+
+    it('should return 500 when provisionUser throws', async () => {
+      vi.mocked(provisionUser).mockRejectedValue(
+        new Error('Provisioning failed')
+      )
+
+      const req = makeRequest(validUserCreatedEvent, VALID_SVIX_HEADERS)
+      const response = await clerkWebhookPOST(req)
+
+      expect(response.status).toBe(500)
+    })
+  })
+
+  // ── Unsupported Events ────────────────────────────────────────────────────
+  describe('Unsupported Event Types', () => {
+    it('should return 200 and do nothing for unsupported event types', async () => {
+      const unsupportedEvent = {
+        type: 'user.updated',
+        data: { id: 'user_123' },
+      }
+      mockWebhook.verify.mockReturnValue(unsupportedEvent)
+
+      const req = makeRequest(unsupportedEvent, VALID_SVIX_HEADERS)
+      const response = await clerkWebhookPOST(req)
+
+      expect(response.status).toBe(200)
+      expect(provisionUser).not.toHaveBeenCalled()
+    })
+  })
+})

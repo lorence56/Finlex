@@ -1,0 +1,12 @@
+node_modules
+.next
+.env.local
+coverage
+test_output.txt
+.git
+.gitignore
+README.md
+TESTING_GUIDE.md
+blob-readme.txt
+*log
+.env.test

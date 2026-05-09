@@ -1,5 +1,6 @@
 import { and, desc, eq, or } from 'drizzle-orm'
 import { Badge } from '@/components/ui/Badge'
+import { PayInvoiceButton } from '@/components/accounting/PayInvoiceButton'
 import { db } from '@/lib/db'
 import { invoices } from '@/db/schema'
 import { requirePortalUser } from '@/lib/portal'
@@ -21,7 +22,10 @@ export default async function PortalInvoicesPage() {
         .where(
           and(
             eq(invoices.tenantId, dbUser.tenantId),
-            or(eq(invoices.clientEmail, client.email), eq(invoices.clientName, client.name))
+            or(
+              eq(invoices.clientEmail, client.email),
+              eq(invoices.clientName, client.name)
+            )
           )
         )
         .orderBy(desc(invoices.createdAt))
@@ -47,9 +51,12 @@ export default async function PortalInvoicesPage() {
 
             <div className="flex items-center gap-3">
               <Badge label={invoice.status} variant="amber" />
-              <button className="rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700">
-                Pay now
-              </button>
+              <PayInvoiceButton
+                invoiceId={invoice.id}
+                disabled={invoice.status === 'paid'}
+                successPath="/portal/invoices?checkout=success"
+                cancelPath="/portal/invoices?checkout=cancel"
+              />
             </div>
           </div>
         </div>

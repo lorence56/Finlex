@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import {
   Building2,
+  CreditCard,
   FileText,
   History,
   ShieldCheck,
@@ -53,6 +54,16 @@ const SETTINGS_CARDS = [
     color: 'text-indigo-600',
     bgColor: 'bg-indigo-50',
     stat: 'documentCount',
+  },
+  {
+    title: 'Billing',
+    description:
+      'Manage your Stripe subscription, payment methods, and invoices.',
+    href: '/dashboard/settings/billing',
+    icon: CreditCard,
+    color: 'text-sky-600',
+    bgColor: 'bg-sky-50',
+    stat: null,
   },
   {
     title: 'Audit Logs',

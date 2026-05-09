@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { differenceInCalendarDays, format } from 'date-fns'
 import { Download, Plus, Repeat } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -475,7 +476,12 @@ export default function InvoicesPage() {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-sm text-slate-500">
-                          {invoice.invoiceNo}
+                          <Link
+                            href={`/dashboard/accounting/invoices/${invoice.id}`}
+                            className="font-medium text-slate-900 transition hover:text-sky-600"
+                          >
+                            {invoice.invoiceNo}
+                          </Link>
                         </p>
                         <p className="mt-1 text-base font-semibold text-slate-900">
                           {invoice.clientName}

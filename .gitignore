@@ -37,6 +37,8 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 ..env*.local
+.env.docker
+.env.test
 
 # vercel
 .vercel
@@ -44,3 +46,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+docker-compose.yml

@@ -643,6 +643,28 @@ export const invoiceLines = pgTable(
   (table) => [index('invoice_lines_invoice_id_idx').on(table.invoiceId)]
 )
 
+export const subscriptions = pgTable(
+  'subscriptions',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    stripeCustomerId: text('stripe_customer_id').notNull(),
+    stripePriceId: text('stripe_price_id'),
+    status: text('status').notNull().default('active'),
+    currentPeriodEnd: timestamp('current_period_end'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('subscriptions_tenant_id_uidx').on(table.tenantId),
+    index('subscriptions_stripe_customer_id_idx').on(table.stripeCustomerId),
+  ]
+)
+
 // ============================================
 // PAYROLL (Kenya — gross & statutory in KES shillings)
 // ============================================
@@ -795,6 +817,8 @@ export type Invoice = typeof invoices.$inferSelect
 export type NewInvoice = typeof invoices.$inferInsert
 export type InvoiceLine = typeof invoiceLines.$inferSelect
 export type NewInvoiceLine = typeof invoiceLines.$inferInsert
+export type Subscription = typeof subscriptions.$inferSelect
+export type NewSubscription = typeof subscriptions.$inferInsert
 export type Employee = typeof employees.$inferSelect
 export type NewEmployee = typeof employees.$inferInsert
 export type PayrollRun = typeof payrollRuns.$inferSelect
@@ -805,3 +829,36 @@ export type TaxReturn = typeof taxReturns.$inferSelect
 export type NewTaxReturn = typeof taxReturns.$inferInsert
 export type ItaxSubmission = typeof itaxSubmissions.$inferSelect
 export type NewItaxSubmission = typeof itaxSubmissions.$inferInsert
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    type: text('type').notNull().default('info'),
+    isRead: boolean('is_read').notNull().default(false),
+    link: text('link'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('notifications_user_id_idx').on(table.userId),
+    index('notifications_tenant_id_idx').on(table.tenantId),
+    index('notifications_is_read_idx').on(table.isRead),
+    index('notifications_created_at_idx').on(table.createdAt),
+  ]
+)
+
+export type Notification = typeof notifications.$inferSelect
+export type NewNotification = typeof notifications.$inferInsert
