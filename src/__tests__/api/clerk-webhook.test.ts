@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { POST as clerkWebhookPOST } from '@/app/api/webhooks/clerk/route'
 
-// ─── next/headers must be mocked BEFORE the route is imported ───────────────
-// The route calls `await headers()` from next/headers, NOT from the Request
-// object, so passing headers to `new Request(...)` has no effect on the route.
-// We control what the route sees by controlling this mock's return value.
+// ─── mockWebhook MUST be at module scope ─────────────────────────────────────
+// vi.mock is hoisted to the top of the file before any code runs.
+// If mockWebhook is declared inside describe(), it doesn't exist yet when
+// the vi.mock('svix') factory executes — causing "not a constructor".
+const mockWebhook = { verify: vi.fn() }
+
+// ─── next/headers mock ───────────────────────────────────────────────────────
 const mockHeadersStore = new Map<string, string>()
 
 vi.mock('next/headers', () => ({
@@ -13,7 +15,16 @@ vi.mock('next/headers', () => ({
   })),
 }))
 
-// ─── Other external dependencies ────────────────────────────────────────────
+// ─── svix mock — MUST use function keyword, not arrow function ───────────────
+// Arrow functions cannot be used as constructors. The route does `new Webhook()`
+// so the mock implementation must be a regular function.
+vi.mock('svix', () => ({
+  Webhook: vi.fn().mockImplementation(function () {
+    return mockWebhook
+  }),
+}))
+
+// ─── Other external dependencies ─────────────────────────────────────────────
 vi.mock('@/lib/provision-user', () => ({ provisionUser: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendEmail: vi.fn() }))
 vi.mock('@/lib/stripe', () => ({
@@ -28,7 +39,9 @@ vi.mock('@/lib/db', () => ({
       values: vi.fn(() => ({ returning: vi.fn(() => [{}]) })),
     })),
     select: vi.fn(() => ({
-      from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(() => []) })) })),
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({ limit: vi.fn(() => []) })),
+      })),
     })),
   },
 }))
@@ -37,19 +50,17 @@ vi.mock('@/db/schema', () => ({
   subscriptions: 'subscriptions',
   eq: vi.fn(),
 }))
-vi.mock('svix', () => ({ Webhook: vi.fn() }))
 
+// ─── Imports after mocks ──────────────────────────────────────────────────────
+import { POST as clerkWebhookPOST } from '@/app/api/webhooks/clerk/route'
 import { provisionUser } from '@/lib/provision-user'
 import { sendEmail } from '@/lib/email'
 import { stripe } from '@/lib/stripe'
 import { db } from '@/lib/db'
 import { Webhook } from 'svix'
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function makeRequest(body: object, svixHeaders?: Record<string, string>) {
-  // Headers in the Request object are irrelevant to the route —
-  // the route reads from next/headers mock, not from here.
-  // We keep them in sync via mockHeadersStore for clarity.
   mockHeadersStore.clear()
   if (svixHeaders) {
     Object.entries(svixHeaders).forEach(([k, v]) => mockHeadersStore.set(k, v))
@@ -76,14 +87,19 @@ const validUserCreatedEvent = {
   },
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
+// ─── Tests ────────────────────────────────────────────────────────────────────
 describe('Clerk Webhook Handler', () => {
-  const mockWebhook = { verify: vi.fn() }
+  // NO mockWebhook declared here — using module-scope one above
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockHeadersStore.clear()
-    ;(Webhook as ReturnType<typeof vi.fn>).mockImplementation(() => mockWebhook)
+
+    // Re-apply after clearAllMocks resets it — MUST use function keyword
+    ;(Webhook as ReturnType<typeof vi.fn>).mockImplementation(function () {
+      return mockWebhook
+    })
+
     vi.stubEnv('CLERK_WEBHOOK_SECRET', 'test-webhook-secret')
 
     vi.mocked(stripe.customers.create).mockResolvedValue({
@@ -119,7 +135,6 @@ describe('Clerk Webhook Handler', () => {
     })
 
     it('should return 400 when svix headers are missing', async () => {
-      // No svix headers added to mockHeadersStore
       const req = makeRequest({ type: 'user.created', data: {} })
       const response = await clerkWebhookPOST(req)
       const data = await response.json()
@@ -205,7 +220,7 @@ describe('Clerk Webhook Handler', () => {
       expect(provisionUser).toHaveBeenCalledWith({
         clerkUserId: 'clerk_user_123',
         email: 'test@example.com',
-        fullName: 'test@example.com', // falls back to email
+        fullName: 'test@example.com',
       })
     })
 
@@ -213,7 +228,7 @@ describe('Clerk Webhook Handler', () => {
       vi.mocked(db.select).mockReturnValue({
         from: vi.fn(() => ({
           where: vi.fn(() => ({
-            limit: vi.fn(() => [{ id: 'existing_sub' }]), // existing subscription
+            limit: vi.fn(() => [{ id: 'existing_sub' }]),
           })),
         })),
       } as never)

@@ -56,63 +56,65 @@ export async function POST(request: Request) {
   }
 
   if (event.type === 'user.created') {
-    const {
-      id: clerkUserId,
-      email_addresses,
-      first_name,
-      last_name,
-    } = event.data // ✅ fixed
+    try {
+      const {
+        id: clerkUserId,
+        email_addresses,
+        first_name,
+        last_name,
+      } = event.data
 
-    const email = email_addresses[0]?.email_address ?? ''
-    const fullName = [first_name, last_name].filter(Boolean).join(' ') || email
+      const email = email_addresses[0]?.email_address ?? ''
+      const fullName =
+        [first_name, last_name].filter(Boolean).join(' ') || email
 
-    const user = await provisionUser({
-      clerkUserId,
-      email,
-      fullName,
-    })
+      const user = await provisionUser({ clerkUserId, email, fullName })
 
-    // Send welcome email
-    await sendEmail({
-      to: email,
-      subject: 'Welcome to Finlex',
-      react: <WelcomeEmail fullName={fullName} email={email} />,
-    })
-
-    // Create welcome notification
-    await db.insert(notifications).values({
-      userId: user.id, // ✅ fixed
-      tenantId: user.tenantId,
-      title: 'Welcome to Finlex',
-      body: 'Welcome! Complete your profile and start managing your legal and accounting matters.',
-      type: 'welcome',
-      link: '/dashboard',
-    })
-
-    const [existingSubscription] = await db
-      .select()
-      .from(subscriptions)
-      .where(eq(subscriptions.tenantId, user.tenantId))
-      .limit(1)
-
-    if (!existingSubscription) {
-      const stripeCustomer = await stripe.customers.create({
-        email,
-        name: fullName || undefined,
-        metadata: {
-          tenantId: user.tenantId,
-        },
+      await sendEmail({
+        to: email,
+        subject: 'Welcome to Finlex',
+        react: <WelcomeEmail fullName={fullName} email={email} />,
       })
 
-      await db.insert(subscriptions).values({
+      await db.insert(notifications).values({
+        userId: user.id,
         tenantId: user.tenantId,
-        stripeCustomerId: stripeCustomer.id, // ✅ fixed
-        status: 'active',
+        title: 'Welcome to Finlex',
+        body: 'Welcome! Complete your profile and start managing your legal and accounting matters.',
+        type: 'welcome',
+        link: '/dashboard',
       })
-    }
 
-    console.log('Created user + tenant for:', email)
+      const [existingSubscription] = await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.tenantId, user.tenantId))
+        .limit(1)
+
+      if (!existingSubscription) {
+        const stripeCustomer = await stripe.customers.create({
+          email,
+          name: fullName || undefined,
+          metadata: { tenantId: user.tenantId },
+        })
+
+        await db.insert(subscriptions).values({
+          tenantId: user.tenantId,
+          stripeCustomerId: stripeCustomer.id,
+          status: 'active',
+        })
+      }
+
+      console.log('Created user + tenant for:', email)
+    } catch (error) {
+      console.error('Failed to process user.created:', error)
+      return NextResponse.json(
+        { error: 'Failed to process webhook' },
+        { status: 500 }
+      )
+    }
   }
 
+  // Outside the if block — always reached for unhandled event types
   return NextResponse.json({ received: true })
 }
