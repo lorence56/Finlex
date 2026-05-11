@@ -14,6 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider>
+      {/* suppressHydrationWarning prevents false positives from browser
+          extensions (e.g. Language Tool, MetaMask) that inject attributes
+          into <html> before React hydrates */}
       <html lang="en" suppressHydrationWarning>
         <body className="antialiased" suppressHydrationWarning>
           {children}

@@ -1,8 +1,6 @@
 import { UserButton } from '@clerk/nextjs'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { Search } from 'lucide-react'
 import clsx from 'clsx'
-import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 import { SearchTrigger } from './SearchTrigger'
 import { CommandPalette } from '@/components/ui/CommandPalette'
 import { NotificationPanel } from '@/components/ui/NotificationPanel'
@@ -46,7 +44,6 @@ export async function Topbar({
 
       <div className="flex flex-1 items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <WorkspaceSwitcher activeWorkspaceId={activeWorkspaceId} />
           <SearchTrigger />
         </div>
 

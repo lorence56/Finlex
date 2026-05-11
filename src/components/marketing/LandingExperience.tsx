@@ -171,10 +171,30 @@ const FAQ_ITEMS = [
 ] as const
 
 const TRUST_ITEMS = [
-  { label: 'Matter ownership', icon: BadgeCheck },
-  { label: 'Deadline tracking', icon: Clock3 },
-  { label: 'Document control', icon: FileCheck2 },
-  { label: 'Team alerts', icon: BellRing },
+  {
+    label: 'Matter ownership',
+    description:
+      'Assign accountability and track progress across every legal case or financial project.',
+    icon: BadgeCheck,
+  },
+  {
+    label: 'Deadline tracking',
+    description:
+      'Never miss a filing or tax date with automated reminders and synchronized calendars.',
+    icon: Clock3,
+  },
+  {
+    label: 'Document control',
+    description:
+      'Securely manage, version, and store critical contracts and financial records in one vault.',
+    icon: FileCheck2,
+  },
+  {
+    label: 'Team alerts',
+    description:
+      'Stay synchronized with real-time notifications on status changes and urgent approvals.',
+    icon: BellRing,
+  },
 ] as const
 
 const FOOTER_LINKS = [
@@ -551,8 +571,7 @@ export function LandingExperience() {
                     <div>
                       <p className="font-semibold text-white">{item.label}</p>
                       <p className="mt-1 text-sm text-slate-400">
-                        Keep the details your team needs without chasing
-                        context.
+                        {item.description}
                       </p>
                     </div>
                   </div>

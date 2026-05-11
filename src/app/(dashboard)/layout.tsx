@@ -4,13 +4,20 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { Topbar } from '@/components/layout/Topbar'
 import { getCurrentWorkspaceId } from '@/lib/current-workspace'
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { userId } = await auth()
-  if (!userId) redirect('/sign-in')
+  const session = await auth()
+  const { userId } = session
+
+  if (!userId) {
+    redirect('/sign-in')
+  }
+
   const activeWorkspaceId = await getCurrentWorkspaceId()
 
   return (

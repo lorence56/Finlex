@@ -14,79 +14,81 @@ import {
 import { db } from '@/lib/db'
 import { getCurrentWorkspaceId } from '@/lib/current-workspace'
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const userRows = await db
-    .select()
+  // Single query — join user + tenant in one round trip instead of two
+  const [userWithTenant] = await db
+    .select({
+      id: users.id,
+      tenantId: users.tenantId,
+      fullName: users.fullName,
+      role: users.role,
+      tenantName: tenants.name,
+    })
     .from(users)
+    .leftJoin(tenants, eq(tenants.id, users.tenantId))
     .where(eq(users.id, userId))
     .limit(1)
 
-  const dbUser = userRows[0]
+  if (!userWithTenant) redirect('/sign-in')
 
-  const tenantRows = dbUser
-    ? await db
-        .select()
-        .from(tenants)
-        .where(eq(tenants.id, dbUser.tenantId))
-        .limit(1)
-    : []
+  const { tenantId, fullName, tenantName } = userWithTenant
 
-  const tenant = tenantRows[0]
-  const activeWorkspaceId = await getCurrentWorkspaceId()
-
+  // Run workspace lookup + all 6 metric queries in parallel
   const [
+    activeWorkspaceId,
     companyCountRows,
     clientCountRows,
     matterCountRows,
     documentCountRows,
     complianceRows,
     accountingTotalsRows,
-  ] = dbUser
-    ? await Promise.all([
-        db
-          .select({ value: count() })
-          .from(companies)
-          .where(eq(companies.tenantId, dbUser.tenantId)),
-        db
-          .select({ value: count() })
-          .from(clients)
-          .where(eq(clients.tenantId, dbUser.tenantId)),
-        db
-          .select({ value: count() })
-          .from(matters)
-          .where(eq(matters.tenantId, dbUser.tenantId)),
-        db
-          .select({ value: count() })
-          .from(documents)
-          .where(eq(documents.tenantId, dbUser.tenantId)),
-        db
-          .select({ value: count() })
-          .from(matters)
-          .where(
-            and(
-              eq(matters.tenantId, dbUser.tenantId),
-              lt(matters.dueDate, new Date()),
-              ne(matters.status, 'closed')
-            )
-          ),
-        db
-          .select({
-            income: sql<number>`coalesce(sum(case when ${accountingEntries.type} = 'income' then ${accountingEntries.amountCents} else 0 end), 0)`,
-            expense: sql<number>`coalesce(sum(case when ${accountingEntries.type} = 'expense' then ${accountingEntries.amountCents} else 0 end), 0)`,
-          })
-          .from(accountingEntries)
-          .where(eq(accountingEntries.tenantId, dbUser.tenantId)),
-      ])
-    : [[], [], [], [], [], []]
+  ] = await Promise.all([
+    getCurrentWorkspaceId(),
+    db
+      .select({ value: count() })
+      .from(companies)
+      .where(eq(companies.tenantId, tenantId)),
+    db
+      .select({ value: count() })
+      .from(clients)
+      .where(eq(clients.tenantId, tenantId)),
+    db
+      .select({ value: count() })
+      .from(matters)
+      .where(eq(matters.tenantId, tenantId)),
+    db
+      .select({ value: count() })
+      .from(documents)
+      .where(eq(documents.tenantId, tenantId)),
+    db
+      .select({ value: count() })
+      .from(matters)
+      .where(
+        and(
+          eq(matters.tenantId, tenantId),
+          lt(matters.dueDate, new Date()),
+          ne(matters.status, 'closed')
+        )
+      ),
+    db
+      .select({
+        income: sql<number>`coalesce(sum(case when ${accountingEntries.type} = 'income' then ${accountingEntries.amountCents} else 0 end), 0)`,
+        expense: sql<number>`coalesce(sum(case when ${accountingEntries.type} = 'expense' then ${accountingEntries.amountCents} else 0 end), 0)`,
+      })
+      .from(accountingEntries)
+      .where(eq(accountingEntries.tenantId, tenantId)),
+  ])
 
   return (
     <WorkspaceOverview
       workspaceId={activeWorkspaceId}
-      userName={dbUser?.fullName}
-      tenantName={tenant?.name}
+      userName={fullName}
+      tenantName={tenantName ?? undefined}
       metrics={{
         companies: companyCountRows[0]?.value ?? 0,
         clients: clientCountRows[0]?.value ?? 0,

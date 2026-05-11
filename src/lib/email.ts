@@ -1,15 +1,17 @@
 import { Resend } from 'resend'
 
-if (!process.env.RESEND_API_KEY) {
-  console.warn('RESEND_API_KEY not configured')
+let _resend: Resend | null = null
+
+function getResend(): Resend {
+  if (!_resend) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error('RESEND_API_KEY environment variable is required')
+    }
+    _resend = new Resend(process.env.RESEND_API_KEY)
+  }
+  return _resend
 }
 
-export const resend = new Resend(process.env.RESEND_API_KEY)
-
-/**
- * Email utility function to send emails safely
- * Returns { success: true } on success or { success: false, error: string } on failure
- */
 export async function sendEmail({
   to,
   subject,
@@ -25,7 +27,7 @@ export async function sendEmail({
       return { success: false, error: 'Email service not configured' }
     }
 
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: 'noreply@finlex.app',
       to,
       subject,
