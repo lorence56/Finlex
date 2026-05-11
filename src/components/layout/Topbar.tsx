@@ -26,7 +26,7 @@ export async function Topbar({
       >
         <div
           className={clsx(
-            'flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br text-xs font-bold text-white shadow-lg',
+            'flex h-10 w-10 items-center justify-center rounded-2xl bg-linear-to-br text-xs font-bold text-white shadow-lg',
             workspace.theme.orb
           )}
         >

@@ -1,19 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import {
-  Building2,
-  FileText,
-  Loader2,
-  Mail,
-  MapPin,
-  Save,
-  Upload,
-} from 'lucide-react'
+import { Building2, Loader2, MapPin, Save, Upload } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SurfaceCard, SurfaceCardHeader } from '@/components/ui/SurfaceCard'
-import { put } from '@vercel/blob'
 
 export default function OrganisationSettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -73,7 +64,7 @@ export default function OrganisationSettingsPage() {
       const { url } = await response.json()
       setForm((prev) => ({ ...prev, logoUrl: url }))
       setSuccess('Logo uploaded successfully')
-    } catch (err) {
+    } catch {
       setError('Failed to upload logo')
     } finally {
       setSaving(false)
@@ -187,7 +178,7 @@ export default function OrganisationSettingsPage() {
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, address: e.target.value }))
                     }
-                    className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:outline-none min-h-[80px]"
+                    className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:outline-none min-h-20"
                     placeholder="Physical or postal address"
                   />
                 </div>
@@ -227,7 +218,7 @@ export default function OrganisationSettingsPage() {
                       letterheadText: e.target.value,
                     }))
                   }
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none min-h-[120px]"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none min-h-30"
                   placeholder="Enter text to appear at the top of generated PDFs (e.g. Legal disclaimer, contact info)"
                 />
                 <p className="mt-1 text-[10px] text-slate-400">

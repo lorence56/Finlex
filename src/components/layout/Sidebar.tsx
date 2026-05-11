@@ -5,10 +5,7 @@ import { usePathname } from 'next/navigation'
 import clsx from 'clsx'
 import { ChevronRight } from 'lucide-react'
 import { workspaceIcons } from '@/components/layout/workspace-icons'
-import {
-  getWorkspaceById,
-  type WorkspaceId,
-} from '@/lib/workspaces'
+import { getWorkspaceById, type WorkspaceId } from '@/lib/workspaces'
 
 import { CanAccess } from '@/components/ui/CanAccess'
 
@@ -28,7 +25,7 @@ export function Sidebar({
       <div className="border-b border-slate-100 px-4 py-4">
         <div
           className={clsx(
-            'rounded-[1.35rem] border border-white/70 bg-gradient-to-br p-4 text-white shadow-lg',
+            'rounded-[1.35rem] border border-white/70 bg-linear-to-br p-4 text-white shadow-lg',
             workspace.theme.panel
           )}
         >
@@ -46,7 +43,9 @@ export function Sidebar({
         {workspace.nav.map(({ label, href, icon, description, resource }) => {
           const Icon = workspaceIcons[icon]
           const active =
-            href === '/dashboard' ? path === '/dashboard' : path.startsWith(href)
+            href === '/dashboard'
+              ? path === '/dashboard'
+              : path.startsWith(href)
 
           const navItem = (
             <Link

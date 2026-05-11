@@ -5,10 +5,7 @@ import { motion } from 'framer-motion'
 import clsx from 'clsx'
 import { ArrowRight, Sparkles } from 'lucide-react'
 import { workspaceIcons } from '@/components/layout/workspace-icons'
-import {
-  getWorkspaceById,
-  type WorkspaceId,
-} from '@/lib/workspaces'
+import { getWorkspaceById, type WorkspaceId } from '@/lib/workspaces'
 
 type OverviewMetrics = {
   companies: number
@@ -54,18 +51,18 @@ export function WorkspaceOverview({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
         className={clsx(
-          'relative overflow-hidden rounded-[2rem] border border-white/60 bg-gradient-to-br p-8 text-white shadow-2xl',
+          'relative overflow-hidden rounded-4xl border border-white/60 bg-linear-to-br p-8 text-white shadow-2xl',
           workspace.theme.panel
         )}
       >
         <div
           className={clsx(
-            'absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l blur-3xl',
+            'absolute inset-y-0 right-0 w-1/2 bg-linear-to-l blur-3xl',
             workspace.theme.glow
           )}
         />
         <div className="absolute -right-16 top-8 h-48 w-48 rounded-full border border-white/10 bg-white/5" />
-        <div className="absolute bottom-[-4.5rem] right-20 h-40 w-40 rounded-full border border-white/10 bg-white/5" />
+        <div className="absolute -bottom-18 right-20 h-40 w-40 rounded-full border border-white/10 bg-white/5" />
 
         <div className="relative flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
@@ -90,7 +87,7 @@ export function WorkspaceOverview({
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[26rem] xl:max-w-[30rem]">
+          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-104 xl:max-w-120">
             {workspace.primaryActions.map((action, index) => {
               const Icon = workspaceIcons[action.icon]
 
@@ -144,7 +141,8 @@ export function WorkspaceOverview({
                   className={clsx(
                     'flex h-11 w-11 items-center justify-center rounded-2xl',
                     metric.color === 'blue' && 'bg-blue-50 text-blue-600',
-                    metric.color === 'green' && 'bg-emerald-50 text-emerald-600',
+                    metric.color === 'green' &&
+                      'bg-emerald-50 text-emerald-600',
                     metric.color === 'amber' && 'bg-amber-50 text-amber-600',
                     metric.color === 'red' && 'bg-rose-50 text-rose-600'
                   )}
@@ -209,7 +207,7 @@ export function WorkspaceOverview({
                 >
                   <Link
                     href={tool.href}
-                    className="group flex h-full flex-col rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-5 transition hover:-translate-y-1 hover:border-slate-300 hover:bg-white hover:shadow-md"
+                    className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-slate-50/80 p-5 transition hover:-translate-y-1 hover:border-slate-300 hover:bg-white hover:shadow-md"
                   >
                     <div
                       className={clsx(
@@ -278,7 +276,17 @@ export function WorkspaceOverview({
                   style={{
                     width: `${Math.max(
                       18,
-                      Math.min(100, Math.round((metrics.documents / Math.max(metrics.documents + metrics.compliance, 1)) * 100))
+                      Math.min(
+                        100,
+                        Math.round(
+                          (metrics.documents /
+                            Math.max(
+                              metrics.documents + metrics.compliance,
+                              1
+                            )) *
+                            100
+                        )
+                      )
                     )}%`,
                   }}
                 />
@@ -294,7 +302,10 @@ export function WorkspaceOverview({
               </p>
               <div className="mt-3 space-y-2">
                 {workspace.focusAreas.map((item) => (
-                  <div key={item} className="flex items-start gap-3 text-sm text-slate-500">
+                  <div
+                    key={item}
+                    className="flex items-start gap-3 text-sm text-slate-500"
+                  >
                     <span
                       className={clsx(
                         'mt-2 h-2 w-2 rounded-full',
